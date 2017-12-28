@@ -36,13 +36,14 @@ class StreamNetwork:
         for sr in sf.iterShapeRecords():
             attrib_values = sr.record
             attribs = dict(zip(attrib_keys, attrib_values))
-            points = sr.shape.points
-            from_node, to_node = relationships[attribs['LineOID']]
-            new_reach = NetworkReach(self, attribs, points, from_node, to_node)
-            self.reaches.append(new_reach)
-            if attribs['LineOID'] == network_settings['MOST_DOWNSTREAM_REACH']:
-                self.most_downstream_reach = new_reach
-                most_downstream_reach_attribs = attribs
+            if network_settings['SMALL_NETWORK_TEST'] is False or attribs['small_test'] > 0:
+                points = sr.shape.points
+                from_node, to_node = relationships[attribs['LineOID']]
+                new_reach = NetworkReach(self, attribs, points, from_node, to_node)
+                self.reaches.append(new_reach)
+                if attribs['LineOID'] == network_settings['MOST_DOWNSTREAM_REACH']:
+                    self.most_downstream_reach = new_reach
+                    most_downstream_reach_attribs = attribs
         if not hasattr(self, 'most_downstream_reach'):
             sys.exit("Reach ID specified as the most downstream reach was not found in network.")
         # Connect the NetworkReach objects based on from_node and to_node attributes

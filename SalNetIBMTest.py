@@ -1,10 +1,10 @@
 import math
 import random
 
+from moviepy.editor import *
 from bokeh.io import export_png
 from bokeh.io.output import reset_output
 from bokeh.plotting import figure, show
-from moviepy.editor import *
 
 from SalNetIBM.fish import LifeHistory
 from SalNetIBM.fish_model import FishModel
@@ -29,7 +29,7 @@ def run_model(n_steps):
                                                                   test_model.schedule.fish_count,
                                                                   test_model.schedule.redd_count))
 
-run_model(100)
+run_model(300)
 
 test_model.generate_report()
 test_model.create_movie(test_model.population_videoframe_function, 'Total Population', 'population')
@@ -82,7 +82,7 @@ test_model.network.plot(fig)
 # test_model.network.plot(fig, color_attr='capacity_redds')
 # test_model.network.plot(fig, color_attr='capacity_small_fish')
 # test_model.network.plot(fig, history_step=25, color_attr='proportion_capacity_small', color_attr_bounds=[0, 1])
-test_model.network.plot(fig, history_step=199, color_attr='temperature', circle_attr='population',
+test_model.network.plot(fig, history_step=99, color_attr='temperature', circle_attr='population',
                         circle_attr_transform=lambda x: 1.0 * math.sqrt(x), circle_line_color='#cb7723',
                         circle_fill_color='#fcb001')#,
                         # circle_hover_attrs=['id', 'length', 'population', 'anadromous', 'resident',

@@ -1,25 +1,3 @@
-# Problems to fix
-
-## Minor debugging
-* We have some fish spawning all the time.
-* We have quite a few fish in spawning migration all the time, especially residents.
-* Double check that movement ascent & descent paths are working correctly. It seems they may be the same,
-  calculated downward from upstream, instead of starting upstream movement with a 50-km jump from the ocean, etc.
-* Kelts were spawning in the ocean. A recent update might have fixed this but I should double check.
-
-# Significant conceptual/biological issues to address
-* The temperatures in the network are all pretty low, below the optimal temperature for growth of well-fed
-  _O. mykiss._ This might be because they're weekly means of daily means and don't really capture the daily
-  maxima that might drive fish responses to thermal extremes. As a result, the thermal adaptation parts of 
-  the model either aren't triggered at all (seeking cool water in summer) or are triggered all the time
-  for the whole network (seeking warmer water in fall). Before these mechanisms can be meaningful, we need
-  a more realistic treatment of temperature variation. 
-* We need a more realistic/mechanistic treatment of capacity.
-* We have an undesirable mixture of a mechanistic mortality mechanism (starvation) and non-mechanistic one
-  (stage-specific survival rates) acting simultaneously; it would be ideal to explicitly model other 
-  mortality sources in a way that roughly matches the overall survival rates we targeted. Mortality should
-  be either fully explicit or fully emergent, not some odd combination of the two.
-            
 # Features to add
 
 ## Visualization and outputs
@@ -68,3 +46,26 @@
 ## User-friendliness
 * Eventually have the settings read from a CSV file rather than hard-coded dictionaries. The code was set up
   to make this a very easy transition.
+  
+# Problems to fix
+
+## Minor debugging
+* We have some fish spawning all the time.
+* We have quite a few fish in spawning migration all the time, especially residents.
+* Double check that movement ascent & descent paths are working correctly. It seems they may be the same,
+  calculated downward from upstream, instead of starting upstream movement with a 50-km jump from the ocean, etc.
+* Kelts were spawning in the ocean. A recent update might have fixed this but I should double check.
+
+# Significant conceptual/biological issues to address
+* The temperatures in the network are all pretty low, below the optimal temperature for growth of well-fed
+  _O. mykiss._ This might be because they're weekly means of daily means and don't really capture the daily
+  maxima that might drive fish responses to thermal extremes. As a result, the thermal adaptation parts of 
+  the model either aren't triggered at all (seeking cool water in summer) or are triggered all the time
+  for the whole network (seeking warmer water in fall). Before these mechanisms can be meaningful, we need
+  a more realistic treatment of temperature variation. 
+* We need a more realistic/mechanistic treatment of capacity.
+* We have an undesirable mixture of a mechanistic mortality mechanism (starvation) and non-mechanistic one
+  (stage-specific survival rates) acting simultaneously; it would be ideal to explicitly model other 
+  mortality sources in a way that roughly matches the overall survival rates we targeted. Mortality should
+  be either fully explicit or fully emergent, not some odd combination of the two.
+        
