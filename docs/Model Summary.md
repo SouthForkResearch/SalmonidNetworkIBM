@@ -113,4 +113,4 @@ in the model tracks a detailed collection of history variables to help trace int
 results back to their biological causes. For example, every important event in each 
 fish's life (such as a change in activity or movement mode) is logged, as are its 
 length and size at every timestep. These diagnostics enable the kind of plots shown
-in the preliminary results. 
+in the [preliminary results](Early%20Results.md).

@@ -84,7 +84,8 @@ Or residents only:
 
 In the videos linked below, we view the population not as circles over the network, but 
 as color-coding of network segments to indicate how close they are to their maximum 
-capacity at various stages.
+capacity at various stages. These plots are important to understanding which mechanisms 
+are limiting the population.
 
 For small fish (less than 100 mm):
 
