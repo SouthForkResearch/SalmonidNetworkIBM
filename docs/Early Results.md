@@ -38,12 +38,9 @@ mechanisms by which excessive water temperature harms a real population.
 ## Survival and success
 
 For each model run, we can look at overall survival:
-
-![Restoration Scenario Population Size](/docs/Media/Results_Restoration/Success%20Rate%20Table.png)
-
-as well as success at various tasks or transitions:
-
 ![Restoration Scenario Survival Curves](/docs/Media/Results_Restoration/Survival%20Curves.png)
+as well as success at various tasks or transitions:
+![Restoration Scenario Population Size](/docs/Media/Results_Restoration/Success%20Rate%20Table.png)
 
 ## Visualizing the population
 
@@ -60,7 +57,7 @@ area at any given time.
 
 Click the thumbnail to view the population summary video on Youtube:
 
-[![Video summary of the restoration scenario population](http://img.youtube.com/vi/XJc7mq6fKtA/0.jpg](https://youtu.be/XJc7mq6fKtA "Full population details")
+[![Video summary of the restoration scenario population](http://img.youtube.com/vi/XJc7mq6fKtA/0.jpg)](https://youtu.be/XJc7mq6fKtA "Full population details")
 
 
 
