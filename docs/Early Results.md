@@ -39,7 +39,7 @@ mechanisms by which excessive water temperature harms a real population.
 
 For each model run, we can look at overall survival:
 
-![Restoration Scenario Population Size](/Media/Results_Restoration/Success Rate Table.png)
+![Restoration Scenario Population Size](Media/Results_Restoration/Success Rate Table.png)
 
 as well as success at various tasks or transitions:
 
