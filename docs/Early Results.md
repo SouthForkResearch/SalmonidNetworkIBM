@@ -24,11 +24,11 @@ year (2013).
 Total population size in both for fish (left) and redds (right) is summarized below 
 for the restoration scenario:
 
-![Restoration Scenario Population Size](/Media/Results_Restoration/Population%20Size.png)
+![Restoration Scenario Population Size](/docs/Media/Results_Restoration/Population%20Size.png)
 
 We can compare this with the baseline scenario:
 
-![Baseline Scenario Population Size](/Media/Results_Baseline/Population%20Size.png)
+![Baseline Scenario Population Size](Media/Results_Baseline/Population%20Size.png)
 
 These two simulations actually show a smaller population under the cooler, restored 
 temperatures; this is not a serious prediction, but an artifact of the preliminary 
