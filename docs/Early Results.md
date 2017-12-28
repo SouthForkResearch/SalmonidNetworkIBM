@@ -24,7 +24,7 @@ year (2013).
 Total population size in both for fish (left) and redds (right) is summarized below 
 for the restoration scenario:
 
-![Restoration Scenario Population Size](docs/Media/Results_Restoration/Population Size.png)
+![Restoration Scenario Population Size](https://github.com/SouthForkResearch/SalmonidNetworkIBM/blob/master/Media/Results_Restoration/Population Size.png)
 
 We can compare this with the baseline scenario:
 
