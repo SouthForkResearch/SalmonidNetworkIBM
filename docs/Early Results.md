@@ -24,7 +24,7 @@ year (2013).
 Total population size in both for fish (left) and redds (right) is summarized below 
 for the restoration scenario:
 
-![Restoration Scenario Population Size](/Media/Results_Restoration/Population Size.png)
+![Restoration Scenario Population Size](docs/Media/Results_Restoration/Population Size.png)
 
 We can compare this with the baseline scenario:
 
@@ -43,7 +43,7 @@ For each model run, we can look at overall survival:
 
 as well as success at various tasks or transitions:
 
-![Restoration Scenario Population Size](/Media/Results_Restoration/Survival Curves.png)
+![Restoration Scenario Survival Curves](/Media/Results_Restoration/Survival Curves.png)
 
 ## Visualizing the population
 
@@ -51,6 +51,12 @@ After a model run, we can stitch together a picture of the population at every t
 including where the fish are (circles on the map, with areas proportional to the number
 of fish), what they're doing, size distribution over time, and where the current 
 frame fits onto the overall population size plots.
+
+Two special reaches on the network are shown for convenience without realistic position
+or length: the "ocean reach" which represents the entire ocean, and the "migration reach"
+represents approximately 1,100 km of river from the lower end of this Upper Salmon network
+to the ocean. Both are visualized with placeholders to show how many fish are in each 
+area at any given time. 
 
 [![Video summary of the restoration scenario population](http://img.youtube.com/vi/XJc7mq6fKtA/0.jpg)](https://youtu.be/XJc7mq6fKtA "Full population details")
 
