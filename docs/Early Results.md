@@ -106,6 +106,9 @@ eventually lost all fish in the Yankee Fork, due to artifacts from some of the
 unrealistic placeholders in the current model. Eventually, matching these to field 
 data will be a key step in model validation.
 
+A glitch in the current plotting code left some of these unlabeled, but they 
+alternate stages: smolt, spawner, smolt, spawner, smolt, spawner.
+
 ![Fish Passage Plots](/docs/Media/Results_Restoration/Passage%20Plots.png)
 
 ### Individual fish histories
@@ -120,7 +123,11 @@ For example, the following fish follows a fairly realistic sequence of major lif
 to its spawning grounds. However, its growth is too slow, and it mostly experiences
 very low temperatures.
 
-![Fish Passage Plots](/docs/Media/Results_Restoration/selected%20anadromous%20individuals/fish%20219327.png)
+![Anadromous individual](/docs/Media/Results_Restoration/selected%20anadromous%20individuals/fish%20219327.png)
+
+In contrast, this resident individual spends its long life in a small area:
+
+![Resident individual](/docs/Media/Results_Restoration/selected%20resident%20individuals/fish%20425707.png)
 
 Although it is not possible to display here on Github, hovering over the circles indicating 
 fish positions in the direct model output displays a detailed list of variables describing
