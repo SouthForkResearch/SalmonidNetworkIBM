@@ -28,7 +28,7 @@ for the restoration scenario:
 
 We can compare this with the baseline scenario:
 
-![Baseline Scenario Population Size](/Media/Results_Baseline/Population Size.png)
+![Baseline Scenario Population Size](/docs/Media/Results_Baseline/Population Size.png)
 
 These two simulations actually show a smaller population under the cooler, restored 
 temperatures; this is not a serious prediction, but an artifact of the preliminary 
