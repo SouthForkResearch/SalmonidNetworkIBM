@@ -28,7 +28,7 @@ for the restoration scenario:
 
 We can compare this with the baseline scenario:
 
-![Baseline Scenario Population Size](Media/Results_Baseline/Population%20Size.png)
+![Baseline Scenario Population Size](/docs/Media/Results_Baseline/Population%20Size.png)
 
 These two simulations actually show a smaller population under the cooler, restored 
 temperatures; this is not a serious prediction, but an artifact of the preliminary 
@@ -39,11 +39,11 @@ mechanisms by which excessive water temperature harms a real population.
 
 For each model run, we can look at overall survival:
 
-![Restoration Scenario Population Size](/Media/Results_Restoration/Success%20Rate%20Table.png)
+![Restoration Scenario Population Size](/docs/Media/Results_Restoration/Success%20Rate%20Table.png)
 
 as well as success at various tasks or transitions:
 
-![Restoration Scenario Survival Curves](/Media/Results_Restoration/Survival%20Curves.png)
+![Restoration Scenario Survival Curves](/docs/Media/Results_Restoration/Survival%20Curves.png)
 
 ## Visualizing the population
 
@@ -58,7 +58,9 @@ represents approximately 1,100 km of river from the lower end of this Upper Salm
 to the ocean. Both are visualized with placeholders to show how many fish are in each 
 area at any given time. 
 
-[![Video summary of the restoration scenario population](http://img.youtube.com/vi/XJc7mq6fKtA/0.jpg =800x)](https://youtu.be/XJc7mq6fKtA "Full population details")
+Click the thumbnail to view the population summary video on Youtube:
+
+[![Video summary of the restoration scenario population](http://img.youtube.com/vi/XJc7mq6fKtA/0.jpg](https://youtu.be/XJc7mq6fKtA "Full population details")
 
 
 
