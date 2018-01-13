@@ -1,5 +1,6 @@
 import math
 import random
+import os
 
 from moviepy.editor import *
 from bokeh.io import export_png
@@ -35,8 +36,7 @@ test_model.generate_report()
 test_model.create_movie(test_model.population_videoframe_function, 'Total Population', 'population')
 test_model.create_movie(test_model.population_videoframe_function, 'Redd Count', 'redds')
 test_model.create_movie(test_model.capacity_videoframe_function, 'Redd Capacity', 'proportion_capacity_redds')
-export_png(test_model.passage_report(), export_settings['RESULTS_PATH'] + "Passage Plots.png")
-
+export_png(test_model.passage_report(), os.path.join(export_settings['RESULTS_PATH'], "Passage Plots.png"))
 
 # cProfile.run('run_model(500)', 'runstats')
 # p = pstats.Stats('runstats')

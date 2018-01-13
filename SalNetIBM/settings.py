@@ -1,5 +1,9 @@
+import os
+
+BASE_DIRECTORY = os.path.join(os.path.expanduser("~"), 'Dropbox', 'SFR')
+
 export_settings = dict(
-    RESULTS_PATH="/Users/Jason/Dropbox/SFR/Projects/SalmonidNetworkIBMResults/"
+    RESULTS_PATH=os.path.join(BASE_DIRECTORY, 'Projects', 'SalmonidNetworkIBM', 'Results')
 )
 
 time_settings = dict(
@@ -8,16 +12,15 @@ time_settings = dict(
 )
 
 network_settings = dict(
-    SMALL_NETWORK_TEST=False,  # set to True to use only a small subset of the network
     MOST_DOWNSTREAM_REACH=2962,
     NETWORK_TO_OCEAN_DISTANCE=1115,  # km from the lowermost node of our network to the ocean
     LEMHI_MOUTH=1627,
     PAHSIMEROI_MOUTH=2242,
     YANKEE_FORK_MOUTH=3760,
-    SHAPEFILE="/Users/Jason/Dropbox/SFR/Projects/SalmonidNetworkIBM/Network/G_SalmonNetwork_R1_TextFields_20171206.shp",
-    NODE_RELATIONSHIP_FILE="/Users/Jason/Dropbox/SFR/Projects/SalmonidNetworkIBM/Network/Salmon_noderelationship_20171003.dbf",
-    #TEMPERATURE_FILE="/Users/Jason/Dropbox/SFR/UpperSalmon/HexSim/RipVeg/2013/Mean/USal_2013_8D_pot_Mn.shp" # restoration scenario, 2013
-    TEMPERATURE_FILE="/Users/Jason/Dropbox/SFR/UpperSalmon/HexSim/RipVeg/2013/Mean/USal_2013_8D_curr_Mn.shp" # regular scenario, 2013
+    SHAPEFILE=os.path.join(BASE_DIRECTORY, 'Projects', 'SalmonidNetworkIBM', 'Network', 'SalmonNetwork_R1_20171018.shp'),
+    NODE_RELATIONSHIP_FILE=os.path.join(BASE_DIRECTORY, 'Projects', '2017-07 PythonIBM', 'SalmonidNetworkIBM', 'Network', 'Salmon_noderelationship_20171003.dbf'),
+    #TEMPERATURE_FILE=os.path.join(BASE_DIRECTORY, 'UpperSalmon', 'HexSim', 'RipVeg', '2013', 'Mean', 'USal_2013_8D_pot_Mn.shp'),  # restoration 2013 temps
+    TEMPERATURE_FILE=os.path.join(BASE_DIRECTORY, 'UpperSalmon', 'HexSim', 'RipVeg', '2013', 'Mean', 'USal_2013_8D_curr_Mn.shp')  # regular 2013 temps
 )
 
 spawning_settings = dict(

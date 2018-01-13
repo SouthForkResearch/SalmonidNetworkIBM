@@ -20,8 +20,10 @@ from .redd import Redd
 from .stream_network import StreamNetwork
 from .settings import time_settings, export_settings, network_settings
 
+
 class FishModel(Model):
     """A model with several fish."""
+
     def __init__(self, initial_population_size):
         self.schedule = DominanceBasedActivation(self, time_settings['WEEKS_PER_YEAR'])
         # Load the network
@@ -261,11 +263,11 @@ class FishModel(Model):
 
     def create_movie(self, frame_function, movie_name, attr):
         """ The frame_function should be a function that takes one parameter (frame) and return a figure."""
-        temp_path = export_settings['RESULTS_PATH'] + "temp_video_frames_" + str(random.randint(1, 999999)) + "/"
+        temp_path = os.path.join(export_settings['RESULTS_PATH'], "temp_video_frames_" + str(random.randint(1, 999999)))
         os.mkdir(temp_path)
         frame_paths = []
         for step in np.arange(1, self.schedule.steps):
-            frame_paths.append(temp_path + "frame {0:07d}.png".format(step))
+            frame_paths.append(os.path.join(temp_path, "frame {0:07d}.png".format(step)))
             frame_fig = frame_function(step, attr)
             export_png(frame_fig, frame_paths[-1])
             print("Exported frame {0} of {1} for movie {2}.".format(step, self.schedule.steps, movie_name))
@@ -274,15 +276,14 @@ class FishModel(Model):
         print("Concatenating frames into final video.")
         concat_clip = concatenate_videoclips(clips, method="compose")
         print("Writing final video file.")
-        concat_clip.write_videofile('{0}/{1}.mp4'.format(export_settings['RESULTS_PATH'], movie_name), fps=30)
+        concat_clip.write_videofile(os.path.join(export_settings['RESULTS_PATH']), movie_name + '.mp4', fps=30)
         shutil.rmtree(temp_path, ignore_errors=True)
         print("Finished exporting {0}.mp4.".format(movie_name))
-
 
     def passage_plot(self, passage, title=""):
         passage_times_x = np.arange(self.schedule.steps) / time_settings['WEEKS_PER_YEAR']
         passage_times_y = np.bincount([item[0] for item in passage])
-        passage_times_y = np.pad(passage_times_y, (0, len(passage_times_x)-len(passage_times_y)),'constant')
+        passage_times_y = np.pad(passage_times_y, (0, len(passage_times_x) - len(passage_times_y)), 'constant')
         passage_ages = np.array([item[2] for item in passage]) / time_settings['WEEKS_PER_YEAR']
         passage_lengths = np.array([item[3] for item in passage])
         passage_masses = np.array([item[4] for item in passage])
@@ -314,7 +315,7 @@ class FishModel(Model):
         timing_fig.toolbar.logo = None
         overall_title = Div(text="<h2 style='width:900px'>{0}</h2>".format(title))
         return column([overall_title, row([timing_fig, age_fig]), row([mass_fig, length_fig])])
-    
+
     def passage_report(self):
         mainstem_smolt_passage = self.network.reach_with_id(
             network_settings['MOST_DOWNSTREAM_REACH']).passage_stats(Activity.SMOLT_OUTMIGRATION, 'downstream',
@@ -343,7 +344,7 @@ class FishModel(Model):
             self.passage_plot(yankee_spawner_passage, "Spawner passage at the Yankee Fork mouth"),
             self.passage_plot(pahsimeroi_smolt_passage, "Smolt passage at the Pahsimeroi River mouth"),
             self.passage_plot(pahsimeroi_spawner_passage, "Spawner passage at the Pahsimeroi River mouth")
-            ])
+        ])
 
     def create_all_movies(self):
         self.create_movie(self.mainpanel_videoframe_function, 'Total Population Details', 'population')
@@ -352,18 +353,18 @@ class FishModel(Model):
         self.create_movie(self.population_videoframe_function, 'Anadromous Population', 'anadromous')
         self.create_movie(self.population_videoframe_function, 'Redd Count', 'n_redds')
         self.create_movie(self.capacity_videoframe_function, 'Small Fish Capacity',
-                                'proportion_capacity_small')
+                          'proportion_capacity_small')
         self.create_movie(self.capacity_videoframe_function, 'Medium Fish Capacity',
-                                'proportion_capacity_medium')
+                          'proportion_capacity_medium')
         self.create_movie(self.capacity_videoframe_function, 'Redd Capacity', 'proportion_capacity_redds')
 
     def generate_report(self, movies=True, passage=True, individuals=10):
         export_path = export_settings['RESULTS_PATH']
         print("Exporting basic plots.")
-        export_png(self.survival_plot(), export_path + "Survival Curves.png")
-        export_png(self.plot_population_size(), export_path + "Population Size.png")
-        export_png(self.mortality_source_table(), export_path + "Mortality Source Table.png")
-        export_png(self.success_rate_table(), export_path + "Success Rate Table.png")
+        export_png(self.survival_plot(), os.path.join(export_path, "Survival Curves.png"))
+        export_png(self.plot_population_size(), os.path.join(export_path, "Population Size.png"))
+        export_png(self.mortality_source_table(), os.path.join(export_path, "Mortality Source Table.png"))
+        export_png(self.success_rate_table(), os.path.join(export_path, "Success Rate Table.png"))
         if individuals > 0:
             print("Exporting representative individual fish histories.")
             self.schedule.dead_fish.sort(key=lambda x: -x.age_weeks)
@@ -371,25 +372,25 @@ class FishModel(Model):
             interesting_anad_fish = [fish for fish in self.schedule.dead_fish if
                                      len(fish.activity_history) > 7 and fish.life_history is LifeHistory.ANADROMOUS]
             interesting_res_fish = [fish for fish in self.schedule.dead_fish if
-                                     len(fish.activity_history) > 7 and fish.life_history is LifeHistory.RESIDENT]
+                                    len(fish.activity_history) > 7 and fish.life_history is LifeHistory.RESIDENT]
             anad_fish = random.sample(interesting_anad_fish, individuals)
             res_fish = random.sample(interesting_res_fish, individuals)
-            old_path = export_path + "oldest individuals/"
-            anad_path = export_path + "selected anadromous individuals/"
-            res_path = export_path + "selected resident individuals/"
+            old_path = os.path.join(export_path, "oldest individuals")
+            anad_path = os.path.join(export_path, "selected anadromous individuals")
+            res_path = os.path.join(export_path, "selected resident individuals")
             for path in (old_path, anad_path, res_path):
                 if not os.path.exists(path):
                     os.mkdir(path)
             for fish in oldest_fish:
-                export_png(fish.plot(), old_path + "fish {0}.png".format(fish.unique_id))
+                export_png(fish.plot(), os.path.join(old_path, "fish {0}.png".format(fish.unique_id)))
             for fish in anad_fish:
-                export_png(fish.plot(), anad_path + "fish {0}.png".format(fish.unique_id))
+                export_png(fish.plot(), os.path.join(anad_path, "fish {0}.png".format(fish.unique_id)))
             for fish in res_fish:
-                export_png(fish.plot(), res_path + "fish {0}.png".format(fish.unique_id))
+                export_png(fish.plot(), os.path.join(res_path, "fish {0}.png".format(fish.unique_id)))
         if movies:
             print("Exporting movies.")
             self.create_all_movies()
         if passage:
             print("Exporting passage statistics.")
-            export_png(self.passage_report(), export_path + "Passage Plots.png")
+            export_png(self.passage_report(), os.path.join(export_path, "Passage Plots.png"))
         print("Report export complete.")

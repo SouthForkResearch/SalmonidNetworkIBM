@@ -1,25 +1,10 @@
 # Brief summary and goals
 
-This model helps explore relationships between salmonid (currently steelhead, *Oncorhynchus
-mykiss*) population dynamics and the 
-environmental and physiological processes that govern the lives of individual fish. It
-creates a population of simulated fish and tracks the location, characteristics, and 
-actions of each individual throughout its life cycle and its interactions with a 
-changing environment. The environment is a large river network (currently the Upper Salmon 
-basin in Idaho) represented in 1-km pieces with channel characteristics and weekly 
-temperature estimates derived from a variety of geospatial data sources and models.
+This model helps explore relationships between salmonid (currently steelhead, *Oncorhynchus mykiss*) population dynamics and the  environmental and physiological processes that govern the lives of individual fish. It creates a population of simulated fish and tracks the location, characteristics, and actions of each individual throughout its life cycle and its interactions with a changing environment. The environment is a large river network (currently the Upper Salmon basin in Idaho) represented in 1-km pieces with channel characteristics and weekly temperature estimates derived from a variety of geospatial data sources and models.
 
-We can use the model to predict how the population is likely to respond to novel
-changes to its environment, including potential habitat restoration actions. Detailed
-diagnostics make it possible to determine which mechanisms underlie any given prediction.
-Thus, instead of operating as a "black box," the model is a transparent source of 
-ecological hypotheses that may be independently evaluated or prioritized based on 
-their importance in the model and local biologists' knowledge.
+We can use the model to predict how the population is likely to respond to novel changes to its environment, including potential habitat restoration actions. Detailed diagnostics make it possible to determine which mechanisms underlie any give prediction. Thus, instead of operating as a "black box," the model is a transparent source of ecological hypotheses that may be independently evaluated or prioritized based on their importance in the model and local biologists' knowledge.
 
-This model differs from other large-scale population models in the high level of detail with 
-which it treats the life of each individual simulated fish. And it differs from other 
-detailed models of individual fish behavior in that it works on the scale of a large
-stream network (thousands of river miles) rather than one short reach.
+This model differs from other large-scale population models in the high level of detail with which it treats the life of each individual simulated fish. And it differs from other detailed models of individual fish behavior in that it works on the scale of a largestream network (thousands of river miles) rather than one short reach.
 
 # Basic structure of the model
 
