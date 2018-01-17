@@ -26,6 +26,10 @@ class NetworkReach:
         self.area_solar = attribs['area_solar']
         self.conductivity = attribs['prdCond']
         self.gnis_name = attribs['GNIS_Name']
+        self.huc10_name = attribs['HUC10NmNRC']
+        self.huc12_name = attribs['HUC12NmNRC']
+        self.gradient = attribs['GRADIENT']
+        self.is_within_steelhead_extent = (attribs['steel_anad'] == 1)
         self.is_ocean = False
         self.is_migration_reach = False
         self.fish = []
@@ -59,6 +63,27 @@ class NetworkReach:
         temperature = self.temperature_at_week(week_of_simulation)
         log_gpp = -11.538 + 0.00827 * self.conductivity + 4.11e-6 * self.area_solar + 0.538 * temperature
         return math.exp(log_gpp)
+
+    def create_habitat_boxes(self):
+        """ Ideally, we just have some numbers we can subtract/add when fish enter/leave.
+
+            Every fish gets food dependent on recent GPP in the area and the size of the area it inhabits.
+
+            The first/largest/dominant fish gets all the space it wants, but should have little to no effect on
+            smaller fish in slower/shallower microhabitats.
+
+            The "boxes" available depend on the fish trying to inhabit them. Smaller fish take up less space. So
+            we want some indicator of territory size.
+
+            How do we have fish of different sizes competing for different "pools" of space?
+
+            Space consists of hundreds of tiny boxes of (depth, velocity). Each fish has some range of tolerable
+            depth and tolerable velocity, and it chooses the boxes within that range that would most closely maximize
+            its NREI under the prevailing conditions, taking enough boxes to fill its territory size. If there aren't
+            enough boxes in the acceptable range to fill its territory size, it goes into competitive dispersal
+
+        """
+        pass
 
     def calculate_midpoint(self):
         npoints = len(self.points)

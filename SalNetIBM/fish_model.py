@@ -32,8 +32,8 @@ class FishModel(Model):
         self.next_fish_index = 0
         self.next_redd_index = 0
         for i in range(initial_population_size):
-            network_reach = self.network.random_reach()
             life_history = random.choice([LifeHistory.ANADROMOUS, LifeHistory.RESIDENT])
+            network_reach = self.network.random_reach(life_history is LifeHistory.ANADROMOUS)
             self.add_fish(network_reach, life_history, None)
 
     def add_fish(self, network_reach, life_history, redd):

@@ -53,8 +53,9 @@ class Fish(Agent):
         self.spawning_reach = network_reach  # usually stays as natal reach, but can change to stray
         self.home_reach = network_reach  # home reach for feeding residents
         self.life_history = life_history
-        if life_history is LifeHistory.ANADROMOUS and random.random() < spawning_settings['STRAY_PROBABILITY']:
-            self.spawning_reach = network_reach.network.random_reach()
+        if life_history is LifeHistory.ANADROMOUS and (random.random() < spawning_settings['STRAY_PROBABILITY']
+                                                       or not self.spawning_reach.is_within_steelhead_extent):
+            self.spawning_reach = network_reach.network.random_reach(True)
         if redd is None:  # only for the fish created when initializing the model
             self.position_within_reach = random.uniform(0, network_reach.length)
             self.origin = Origin.INITIATED
@@ -392,6 +393,7 @@ class Fish(Agent):
                                                                    self.movement_mode,
                                                                    self.position_within_reach,
                                                                    self.movement_rate,
+                                                                   self.life_history,
                                                                    anadromy_allowed)
             if stop:
                 self.set_movement(Movement.STATIONARY)

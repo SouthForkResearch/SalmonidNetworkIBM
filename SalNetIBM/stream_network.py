@@ -117,10 +117,11 @@ class StreamNetwork:
         for reach in self.reaches:
             reach.step(timestep)
 
-    def random_reach(self):
+    def random_reach(self, restricted_to_steelhead_extent=False):
         """ Returns a random reach from the main network, excluding the ocean and migration reaches. """
         reach = random.choice(self.reaches)
-        if not reach.is_ocean and not reach.is_migration_reach:
+        if not reach.is_ocean and not reach.is_migration_reach \
+                and (reach.is_within_steelhead_extent or not restricted_to_steelhead_extent):
             return reach
         else:
             return self.random_reach()
@@ -206,7 +207,7 @@ class StreamNetwork:
             # tutorial for adding year slider: https://rebeccabilbro.github.io/interactive-viz-bokeh/
 
     @staticmethod
-    def position_after_movement(origin, direction, position_within_origin, rate, anadromy_allowed, upstream_mode='Random'):
+    def position_after_movement(origin, direction, position_within_origin, rate, life_history, anadromy_allowed, upstream_mode='Random'):
         """ direction can be 'Upstream' or 'Downstream'
             upstream_mode can be 'Random' to choose at random; eventually, I want to add modes to preferentially
             Setting anadromy_allowed to True allows the fish to move into the migration and ocean reaches; otherwise
@@ -215,6 +216,11 @@ class StreamNetwork:
             it would eventually be useful to add an exploratory behavior for fish that get stuck at tributary
             tips, in which they move downstream until hitting a randomly selected higher stream order, then move
             up that one at random
+
+            Note that steelhead outside the steelhead extent can move downstream to get back into the steelhead extent,
+            as needed for dispersion of those produced as offspring from residents in those areas, but they can't move
+            upstream when outside steelhead extent, to prevent spawners from straying outsie the extent.
+
             Returns a tuple (reach, position, stopped)
             """
         current_reach = origin
@@ -232,7 +238,9 @@ class StreamNetwork:
             if upstream_mode == 'Random':
                 position_within_reach += rate
                 while position_within_reach > current_reach.length:
-                    if len(current_reach.upstream_reaches) == 0:
+                    upstream_reaches = current_reach.upstream_reaches if life_history is LifeHistory.RESIDENT \
+                        else [reach for reach in current_reach.upstream_reaches if reach.is_within_steelhead_extent]
+                    if len(upstream_reaches) == 0:
                         return current_reach, position_within_reach, True  # don't move upstream beyond tips
                     upstream_reach = random.choice(current_reach.upstream_reaches)
                     position_within_reach -= current_reach.length

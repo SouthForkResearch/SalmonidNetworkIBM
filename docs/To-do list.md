@@ -33,6 +33,7 @@
   offset it. However, the temperatures are so low right now that nowhere on the network has the "warm" water
   the fish are seeking during these weeks. Currently, this mechanism is disabled altogether. Summer
   cold-seeking is never triggered by the current network temperatures at all.
+* Ideally, prey availability would lag behind GPP.
             
 ## Speed/memory optimizations
 * Might need to spend some time with a memory profiler and figuring out how to make large/log runs dump
