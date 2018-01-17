@@ -94,7 +94,7 @@ class StreamNetwork:
         self.ocean_reach = NetworkReach(self, most_downstream_reach_attribs, points, None, None)
         self.migration_reach.downstream_reach = self.ocean_reach
         self.ocean_reach.upstream_reaches.append(self.migration_reach)
-        self.ocean_reach.length = 1
+        self.ocean_reach.length = network_settings['OCEAN_REACH_LENGTH']
         self.ocean_reach.length_m = self.ocean_reach.length * 1000
         self.ocean_reach.is_ocean = True
         self.ocean_reach.id = -1
@@ -270,22 +270,35 @@ class StreamNetwork:
                 descent_index += 1
                 if descent_index < len(descent_path):
                     position_within_reach += descent_path[descent_index].length
-                if position_within_reach < 0 and descent_index >= len(descent_path):
-                    # if we overshot the destination reach, choose a random location within the last reach
-                    position_within_reach = random.uniform(0.0, descent_path[-1].length)
+                else:
+                    if position_within_reach < 0: # if we overshot the destination reach, choose a random location within the last reach
+                        position_within_reach = random.uniform(0.0, descent_path[-1].length)
+                    final_route.append((descent_path[-1], position_within_reach))
+                    break
+        # print([reach.id for reach in ascent_path])
         while ascent_index < len(ascent_path):
             if not (ascent_index == 0 and len(descent_path) > 0):  # don't double-record position when cornering
+                # print("Adding reach {0} position {1} to final path.".format(ascent_path[ascent_index].id, position_within_reach))
                 final_route.append((ascent_path[ascent_index], position_within_reach))
             position_within_reach += rate
             current_reach_length = ascent_path[ascent_index].length
+            # print("Changing position_within_reach to {0}, noting current_reach_length = {1}".format(position_within_reach, current_reach_length))
             while position_within_reach > current_reach_length:
                 ascent_index += 1
                 position_within_reach -= current_reach_length
+                # print("Changing ascent_index to {0} out of {1}".format(ascent_index, len(ascent_path)))
                 if ascent_index < len(ascent_path):
+                    # print("New ascent index points to reach {0} and position_within_reach to {1}".format(ascent_path[ascent_index].id, position_within_reach))
                     current_reach_length = ascent_path[ascent_index].length
-                if position_within_reach > current_reach_length and ascent_index >= len(ascent_path):
+                else:
                     current_reach_length = ascent_path[-1].length
-                    position_within_reach = random.uniform(0.0, current_reach_length)
+                    if position_within_reach > current_reach_length:
+                        position_within_reach = random.uniform(0.0, current_reach_length)
+                    # print("Adding reach {0} position {1} to final path.".format(ascent_path[-1].id, position_within_reach))
+                    final_route.append((ascent_path[-1], position_within_reach))
+                    break
+        assert final_route[0][0] is origin, "Route from reach {0} position {3} to reach {1} at rate {4} begins at reach {2}".format(origin.id, destination.id, final_route[0][0].id, final_route[0][1], rate)
+        assert final_route[-1][0] is destination, "Route from reach {0} position {3} to reach {1} at rate {4} ends at reach {2}".format(origin.id, destination.id, final_route[-1][0].id, final_route[0][1], rate)
         return final_route
 
     @staticmethod

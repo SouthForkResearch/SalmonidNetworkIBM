@@ -52,8 +52,9 @@ class Fish(Agent):
         self.natal_reach = network_reach  # should never change
         self.spawning_reach = network_reach  # usually stays as natal reach, but can change to stray
         self.home_reach = network_reach  # home reach for feeding residents
-        if random.random() < spawning_settings['STRAY_PROBABILITY']:
-            self.natal_reach = network_reach.network.random_reach()
+        self.life_history = life_history
+        if life_history is LifeHistory.ANADROMOUS and random.random() < spawning_settings['STRAY_PROBABILITY']:
+            self.spawning_reach = network_reach.network.random_reach()
         if redd is None:  # only for the fish created when initializing the model
             self.position_within_reach = random.uniform(0, network_reach.length)
             self.origin = Origin.INITIATED
@@ -61,7 +62,6 @@ class Fish(Agent):
             self.position_within_reach = redd.position_within_reach
             self.origin = Origin.BORN
         self.sex = random.choice([Sex.MALE, Sex.FEMALE])
-        self.life_history = life_history
         self.fork_length = 35
         self.mass = 0.5
         self.stray = False
@@ -87,13 +87,19 @@ class Fish(Agent):
         self.current_route = None
         self.current_route_position = 0
 
-        self.reach_history = [(0, self.natal_reach.id)]
-        self.activity_history = [(0, self.activity)]
-        self.movement_history = [(0, self.movement_mode, self.movement_rate)]
+        self._event_log_index = -1  # internal increment for event logs, accessed via property that increments it
+        self.event_history = [(self.event_log_index, 0, "Born into reach {0}".format(self.natal_reach.id))]
+        self.reach_history = [(self.event_log_index, 0, self.natal_reach.id)]
+        self.activity_history = [(self.event_log_index, 0, self.activity)]
+        self.movement_history = [(self.event_log_index, 0, self.movement_mode, self.movement_rate)]
         self.mass_history = []
         self.length_history = []
         self.temperature_history = []
-        self.event_history = []
+
+    @property
+    def event_log_index(self):
+        self._event_log_index += 1
+        return self._event_log_index
 
     @property
     def is_resident(self):
@@ -121,15 +127,15 @@ class Fish(Agent):
         if self.activity is not activity:
             self.activity = activity
             self.activity_duration = 0
-            self.activity_history.append((self.age_weeks, self.activity))
+            self.activity_history.append((self.event_log_index, self.age_weeks, self.activity))
 
     def set_movement(self, movement_mode, movement_rate=0):
         self.movement_mode = movement_mode
         self.movement_rate = movement_rate
-        self.movement_history.append((self.age_weeks, movement_mode, movement_rate))
+        self.movement_history.append((self.event_log_index, self.age_weeks, movement_mode, movement_rate))
 
     def log_event(self, description):
-        self.event_history.append((self.age_weeks, description))
+        self.event_history.append((self.event_log_index, self.age_weeks, description))
 
     def set_spawning_reach(self, reach):
         self.log_event("Set spawning reach = {0}".format(reach.id))
@@ -316,6 +322,12 @@ class Fish(Agent):
         elif self.activity is Activity.SPAWNING and self.sex is Sex.FEMALE:
             self.female_spawn()
 
+        # Male spawners cease to be spawners if there haven't been any females around for a long time
+
+        elif self.activity is Activity.SPAWNING and self.sex is Sex.MALE \
+                and self.activity_duration >= spawning_settings['MAX_WEEKS_TO_WAIT_WITHOUT_MATE']:
+            self.post_spawn(False)
+
         # Kelts heading to the ocean (triggered in self.post_spawn()) stop when they get there
 
         elif self.activity is Activity.KELT_OUTMIGRATION and self.network_reach.is_ocean:
@@ -354,11 +366,8 @@ class Fish(Agent):
             mate.post_spawn(True)
 
     def post_spawn(self, succeeded):
-        self.has_spawned_this_year = succeeded  # WHAT IF FISH FAILS, NEVER GETS HAS_SPAWNED SET TRUE
-        if succeeded:
-            self.log_event("Successfully spawned")
-        else:
-            self.log_event("Failed to spawn")
+        self.has_spawned_this_year = True
+        self.log_event("Successfully spawned" if succeeded else "Failed to spawn")
         survival_probability = self.settings['MALE_POSTSPAWN_SURVIVAL_PROBABILITY'] if self.sex is Sex.MALE \
             else self.settings['FEMALE_POSTSPAWN_SURVIVAL_PROBABILITY']
         if random.random() > survival_probability:
@@ -392,7 +401,7 @@ class Fish(Agent):
                     destination = self.spawning_reach
                 else:
                     destination = self.home_reach
-                if destination == self.network_reach:
+                if self.network_reach == destination:
                     self.set_movement(Movement.STATIONARY)
                     self.current_route = None
                     return
@@ -404,43 +413,15 @@ class Fish(Agent):
             else:
                 if self.current_route_position < len(self.current_route) - 1:
                     self.current_route_position += 1
-            # Spawning fish have a small chance to stray up the wrong branch
-            # if self.movement_mode is Movement.SEEKING_SPAWNING_REACH and len(self.network_reach.upstream_reaches) > 1:
-            #     correct_reach = self.current_route[self.current_route_position][0]
-            #     # PROBLEM -- WHAT IF NEXT REACH ON ROUTE ISNT ADJACENT!!!
-            #     # And what if fish skips a junction moving along its route??? Need to rethink this whole thing!!
-            #     # Maybe precalculate for each network reach the straying probability... but this requires knowledge
-            #       of the intended destination, so that's no good. It may be necessary to treat straying as just randomly
-            #       resetting the home reach. But it would be ideal to make fish stray fairly close in network distance terms
-            #       to their original natal reach in most cases.
-            #     stray_reach = list(self.network_reach.upstream_reaches).remove(correct_reach)[0]
-            #     relative_size_stray_factor = 1 / min((1 + correct_reach.strahler_order - stray_reach.strahler_order, 1)) ** 2
-            #     # Difference between stream orders / stray multiplier
-            #     # No difference or correct reach is smaller: multiplier = 1
-            #     # Correct reach is 1 order larger than straying reach: multiplier = 1/4
-            #     # Correct reach is 2 orders larger than straying reach: multiplier = 1/9
-            #     # Correct reach is 3 orders larger than straying reach: multiplier = 1/16
-            #     # And so on...
-            #     # Right now straying always goes upstream (sometimes just reversing direction), even for resident fish
-            #     # that were migrating downstream to spawning grounds. Also, calculating distance would be messy, so
-            #     # for now the stray fish just goes to a random position within the first reach up the straying branch,
-            #     # rather than maintaining its original speed for this whole timestep.
-            #     stray_probability = relative_size_stray_factor * spawning_settings['EQUAL_STREAM_SIZE_STRAY_PROBABILITY']
-            #     if random.random() < stray_probability:
-            #         self.log_event("Straying into reach {0}".format(stray_reach.id))
-            #         self.stray = True
-            #         self.set_movement(Movement.UPSTREAM, self.movement_rate)
-            #         self.network_reach = stray_reach
-            #         self.position_within_reach = random.uniform([0, stray_reach.length])
-            # if not self.stray:
             self.network_reach, self.position_within_reach = self.current_route[self.current_route_position]
-            if self.current_route_position == len(self.current_route):
+            if self.current_route_position == len(self.current_route) - 1:  # ADDED THE -1 HERE TO FIX THE PROBLEM
                 self.set_movement(Movement.STATIONARY)
                 self.current_route = None
         if self.network_reach != initial_network_reach:
             initial_network_reach.fish.remove(self)
             self.network_reach.fish.append(self)
-            self.reach_history.append((self.age_weeks, self.network_reach.id))
+            self.reach_history.append((self.event_log_index, self.age_weeks, self.network_reach.id))
+
 
     def grow(self, override_p=None):
         if not self.network_reach.is_ocean:
@@ -490,12 +471,12 @@ class Fish(Agent):
             return timestep - self.birth_week
 
     def activity_at_age(self, age_weeks):
-        previous_activity = self.activity_history[0][1]
+        previous_activity = self.activity_history[0][2]
         for activity_timestep, activity in self.activity_history:
             if activity_timestep >= age_weeks:
                 return previous_activity
             previous_activity = activity
-        return self.activity_history[-1][1]
+        return self.activity_history[-1][2]
 
     def length_at_age(self, age):
         return self.length_history[age]
@@ -504,22 +485,27 @@ class Fish(Agent):
         return self.mass_history[age]
 
     def activity_descriptors(self):
-        activity_descriptors = [(x[0], "{0}.".format(x[1])) for x in self.activity_history]
-        reach_descriptors = [(x[0], "Reach {0}.".format(x[1])) for x in self.reach_history]
-        movement_descriptors = [(x[0], "{0} at rate {1}.".format(x[1], x[2])) for x in
+        activity_descriptors = [(x[0], x[1], "{0}.".format(x[2])) for x in self.activity_history]
+        reach_descriptors = [(x[0], x[1], "Reach {0}.".format(x[2])) for x in self.reach_history]
+        movement_descriptors = [(x[0], x[1], "{0} at rate {1}.".format(x[2], x[3])) for x in
                                 self.movement_history]
-        event_descriptors = [(x[0], "{0}.".format(x[1])) for x in self.event_history]
+        event_descriptors = [(x[0], x[1], "{0}.".format(x[2])) for x in self.event_history]
         descriptors = sorted(activity_descriptors + movement_descriptors + reach_descriptors + event_descriptors,
                              key=lambda x: x[0])
-        title = "{7} {0} {1} lived to age {2:.2f} ({3} weeks) and died at length {4:.0f} mm ({5:.1f} g) from '{6}'".format(
-            self.life_history.name, self.sex.name, self.age_years, self.age_weeks, self.fork_length, self.mass,
-            self.mortality_reason, self.origin.name)
+        if self.is_dead:
+            title = "{7} {0} {1} id {8} lived to age {2:.2f} ({3} weeks) and died at length {4:.0f} mm ({5:.1f} g) from '{6}'".format(
+                self.life_history.name, self.sex.name, self.age_years, self.age_weeks, self.fork_length, self.mass,
+                self.mortality_reason, self.origin.name, self.unique_id)
+        else:
+            title = "{6} {0} {1} id {7} is still alive at age {2:.2f} ({3} weeks) with current length {4:.0f} mm ({5:.1f} g).".format(
+                self.life_history.name, self.sex.name, self.age_years, self.age_weeks, self.fork_length, self.mass,
+                self.origin.name, self.unique_id)
         lifetext = ""
         for descriptor in descriptors:
-            lifetext += descriptor[1] + "\n"
-        source = ColumnDataSource({'age_weeks': [d[0] for d in descriptors],
-                                   'age_years': [d[0] / time_settings['WEEKS_PER_YEAR'] for d in descriptors],
-                                   'life_event': [d[1] for d in descriptors]
+            lifetext += descriptor[2] + "\n"
+        source = ColumnDataSource({'age_weeks': [d[1] for d in descriptors],
+                                   'age_years': [d[1] / time_settings['WEEKS_PER_YEAR'] for d in descriptors],
+                                   'life_event': [d[2] for d in descriptors]
                                    })
         return title, lifetext, source
 
@@ -530,7 +516,7 @@ class Fish(Agent):
         lifemap.xaxis.visible = False
         lifemap.yaxis.visible = False
         self.network_reach.network.plot(lifemap)
-        reachids = list(np.array(self.reach_history).T[1])
+        reachids = list(np.array(self.reach_history).T[2])
         pointx, pointy = list(np.array([self.network_reach.network.reach_with_id(id).midpoint for id in reachids]).T)
         source = ColumnDataSource({'xs': pointx,
                                    'ys': pointy,

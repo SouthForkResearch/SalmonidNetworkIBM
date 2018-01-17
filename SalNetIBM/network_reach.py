@@ -1,7 +1,9 @@
 import math
 import sys
 import numpy as np
+import functools
 from .fish import LifeHistory
+
 
 class NetworkReach:
     """ The network is represented as a collection of reaches. """
@@ -21,6 +23,9 @@ class NetworkReach:
         self.spring95 = attribs['Winter95']  # SPRING95 ISN'T IN THE NETWORK
         self.area = self.length_m * self.bank_full_width  # area is in m2
         self.capacity_redds = attribs['rdd_M2'] * self.area
+        self.area_solar = attribs['area_solar']
+        self.conductivity = attribs['prdCond']
+        self.gnis_name = attribs['GNIS_Name']
         self.is_ocean = False
         self.is_migration_reach = False
         self.fish = []
@@ -48,6 +53,12 @@ class NetworkReach:
             return self.network.most_downstream_reach.temperature_at_week(week_of_simulation)
         else:
             return self.temperatures[week_of_simulation % len(self.temperatures)]
+
+    @functools.lru_cache(maxsize=None)
+    def gpp_at_week(self, week_of_simulation):
+        temperature = self.temperature_at_week(week_of_simulation)
+        log_gpp = -11.538 + 0.00827 * self.conductivity + 4.11e-6 * self.area_solar + 0.538 * temperature
+        return math.exp(log_gpp)
 
     def calculate_midpoint(self):
         npoints = len(self.points)
@@ -125,7 +136,7 @@ class NetworkReach:
             possible_fish = [fish for fish in all_fish if fish.life_history is LifeHistory.ANADROMOUS]
         else:
             possible_fish = all_fish
-        fish_with_activity = [fish for fish in possible_fish if activity in [item[1] for item in fish.activity_history]]
+        fish_with_activity = [fish for fish in possible_fish if activity in [item[2] for item in fish.activity_history]]
         for fish in fish_with_activity:
             progress += 1
             if progress % int(len(fish_with_activity)/20) == 1:

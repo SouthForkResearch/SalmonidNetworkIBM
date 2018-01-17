@@ -7,7 +7,7 @@ from bokeh.io import export_png
 from bokeh.io.output import reset_output
 from bokeh.plotting import figure, show
 
-from SalNetIBM.fish import LifeHistory
+from SalNetIBM.fish import LifeHistory, Activity, Sex, Movement
 from SalNetIBM.fish_model import FishModel
 from SalNetIBM.settings import export_settings
 
@@ -16,7 +16,15 @@ def clean_show(item):
     reset_output()
     show(item)
 
-test_model = FishModel(100000)
+test_model = FishModel(200000)
+
+# in this one, ascent_path includes 1483, but the final route doesn't get it
+# problem_route = test_model.network.route(test_model.network.ocean_reach, test_model.network.reach_with_id(1483), -23, 50)
+# [(item[0].id, item[1]) for item in problem_route]  # needs to end on 1483
+
+# problem_route = test_model.network.route(test_model.network.reach_with_id(1612), test_model.network.reach_with_id(1613), 0.701, 5)
+# [(item[0].id, item[1]) for item in problem_route]  # needs to end on 1613
+
 
 # fig = figure(plot_width=1024, plot_height=768, toolbar_location='above')
 # test_model.network.plot(fig)
@@ -30,7 +38,64 @@ def run_model(n_steps):
                                                                   test_model.schedule.fish_count,
                                                                   test_model.schedule.redd_count))
 
-run_model(300)
+run_model(1000)
+
+
+test_model.generate_report(movies=False, passage=False, individuals=30)
+
+# ran into error:
+#   File "/Users/Jason/Dropbox/SFR/Projects/SalmonidNetworkIBM/SalNetIBM/fish_model.py", line 223, in success_rate_table
+#     rates['Smolt-to-ocean survival'] = len(fish_that_grew_in_salt) / len(fish_that_smolted)
+# ZeroDivisionError: division by zero
+
+
+def generate_report(self, movies=True, passage=True, individuals=10):
+    export_path = export_settings['RESULTS_PATH']
+    # print("Exporting basic plots.")
+    # export_png(self.survival_plot(), os.path.join(export_path, "Survival Curves.png"))
+    # export_png(self.plot_population_size(), os.path.join(export_path, "Population Size.png"))
+    # export_png(self.mortality_source_table(), os.path.join(export_path, "Mortality Source Table.png"))
+    # export_png(self.success_rate_table(), os.path.join(export_path, "Success Rate Table.png"))
+    if individuals > 0:
+        print("Exporting representative individual fish histories.")
+        self.schedule.dead_fish.sort(key=lambda x: -x.age_weeks)
+        oldest_fish = self.schedule.dead_fish[0:individuals]
+        interesting_anad_fish = [fish for fish in self.schedule.dead_fish if
+                                 len(fish.activity_history) > 7 and fish.life_history is LifeHistory.ANADROMOUS]
+        interesting_res_fish = [fish for fish in self.schedule.dead_fish if
+                                len(fish.activity_history) > 7 and fish.life_history is LifeHistory.RESIDENT]
+        anad_fish = random.sample(interesting_anad_fish, individuals)
+        res_fish = random.sample(interesting_res_fish, individuals)
+        old_path = os.path.join(export_path, "oldest individuals")
+        anad_path = os.path.join(export_path, "selected anadromous individuals")
+        res_path = os.path.join(export_path, "selected resident individuals")
+        for path in (old_path, anad_path, res_path):
+            if not os.path.exists(path):
+                os.mkdir(path)
+        for fish in oldest_fish:
+            export_png(fish.plot(), os.path.join(old_path, "fish {0}.png".format(fish.unique_id)))
+        for fish in anad_fish:
+            export_png(fish.plot(), os.path.join(anad_path, "fish {0}.png".format(fish.unique_id)))
+        for fish in res_fish:
+            export_png(fish.plot(), os.path.join(res_path, "fish {0}.png".format(fish.unique_id)))
+    if movies:
+        print("Exporting movies.")
+        self.create_all_movies()
+    if passage:
+        print("Exporting passage statistics.")
+        export_png(self.passage_report(), os.path.join(export_path, "Passage Plots.png"))
+    print("Report export complete.")
+generate_report(test_model, movies=False, passage=True, individuals=0)
+
+
+# fish 117947: going from reach 478 to seek reach 478 for spawning, somehow ends up in reach 498, doesn't spawn, gets stuck for 3 years
+# fish 146035: somehow jumps from the ocean to the headwaters (reach 3022) instantly during its second / kelt spawning run
+
+# fish 1667879 : teleports way far away in first timestep / dispersal -- NOT SOLVED YET
+
+show(test_model.fish_with_id(9879).plot())
+
+
 
 test_model.generate_report()
 test_model.create_movie(test_model.population_videoframe_function, 'Total Population', 'population')
@@ -68,6 +133,24 @@ random_fish = random.choice(interesting_dead_fish)
 fish_fig = random_fish.plot()
 
 test_model.schedule.dead_fish.sort(key=lambda x: -x.age_weeks)
+
+# Ferreting out specific anoomalies
+
+all_fish = test_model.schedule.fish + test_model.schedule.dead_fish
+
+fish_stuck_spawning = [fish for fish in all_fish if fish.activity is Activity.SPAWNING and fish.activity_duration > 20]
+fish_stuck_migration = [fish for fish in all_fish if fish.activity is Activity.SPAWNING_MIGRATION and fish.activity_duration > 20]
+spawning_in_ocean = [fish for fish in all_fish if fish.activity is Activity.SPAWNING and fish.network_reach.is_ocean]
+spawning_in_migration_reach = [fish for fish in all_fish if fish.activity is Activity.SPAWNING and fish.network_reach.is_migration_reach]
+
+anad_stuck_migration = [fish for fish in fish_stuck_migration if fish.life_history is LifeHistory.ANADROMOUS]
+
+# problem for migration-stuck fish
+
+show(fish_stuck_spawning[0].plot())
+
+
+
 
 
 

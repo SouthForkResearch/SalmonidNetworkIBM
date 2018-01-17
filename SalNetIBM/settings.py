@@ -3,7 +3,7 @@ import os
 BASE_DIRECTORY = os.path.join(os.path.expanduser("~"), 'Dropbox', 'SFR')
 
 export_settings = dict(
-    RESULTS_PATH=os.path.join(BASE_DIRECTORY, 'Projects', 'SalmonidNetworkIBM', 'Results')
+    RESULTS_PATH=os.path.join(BASE_DIRECTORY, 'Projects', 'SalmonidNetworkIBMResults')
 )
 
 time_settings = dict(
@@ -12,13 +12,15 @@ time_settings = dict(
 )
 
 network_settings = dict(
+    SMALL_NETWORK_TEST=False,        # set to True to run things on a subset of the network
     MOST_DOWNSTREAM_REACH=2962,
     NETWORK_TO_OCEAN_DISTANCE=1115,  # km from the lowermost node of our network to the ocean
+    OCEAN_REACH_LENGTH=250,          # km "length" of the ocean reach, used to spread out run timing a bit
     LEMHI_MOUTH=1627,
     PAHSIMEROI_MOUTH=2242,
     YANKEE_FORK_MOUTH=3760,
     SHAPEFILE=os.path.join(BASE_DIRECTORY, 'Projects', 'SalmonidNetworkIBM', 'Network', 'SalmonNetwork_R1_20171018.shp'),
-    NODE_RELATIONSHIP_FILE=os.path.join(BASE_DIRECTORY, 'Projects', '2017-07 PythonIBM', 'SalmonidNetworkIBM', 'Network', 'Salmon_noderelationship_20171003.dbf'),
+    NODE_RELATIONSHIP_FILE=os.path.join(BASE_DIRECTORY, 'Projects', 'SalmonidNetworkIBM', 'Network', 'Salmon_noderelationship_20171003.dbf'),
     #TEMPERATURE_FILE=os.path.join(BASE_DIRECTORY, 'UpperSalmon', 'HexSim', 'RipVeg', '2013', 'Mean', 'USal_2013_8D_pot_Mn.shp'),  # restoration 2013 temps
     TEMPERATURE_FILE=os.path.join(BASE_DIRECTORY, 'UpperSalmon', 'HexSim', 'RipVeg', '2013', 'Mean', 'USal_2013_8D_curr_Mn.shp')  # regular 2013 temps
 )
@@ -26,7 +28,7 @@ network_settings = dict(
 spawning_settings = dict(
     REQUIRED_DEGREE_DAYS_TO_EMERGE=340,
     LIFE_HISTORY_INHERITANCE_PROBABILITY=0.75,
-    MAX_WEEKS_TO_WAIT_WITHOUT_MATE=6,  # how long a female will remain a spawner before giving up on finding a mate
+    MAX_WEEKS_TO_WAIT_WITHOUT_MATE=6,  # how long a fish will remain a spawner before giving up on finding a mate
     STRAY_PROBABILITY=0.02  # arbitrary guess
 )
 

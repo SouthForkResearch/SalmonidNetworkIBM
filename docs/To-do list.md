@@ -20,9 +20,7 @@
 * Current mechanisms don't reflect known steelhead extent at all (straying and other movements, as well as
   random life history switching.)
 * We currently have very simplistic straying mechanisms. Females that find their spawning reach already
-  at capacity become strays. Also, all fish have a very low chance at birth to be assigned a spawning reach
-  different from their natal reach, but the new reach is selected at random from the whole network. Eventually, 
-  I could have a system that randomly generates a straying distance (exponential distribution)
+  at capacity become strays. Also, all fish have a very low chance at birth to be assigned a spawning reach different from their natal reach, but the new reach is selected at random from the whole network. Eventually, I could have a system that randomly generates a straying distance (exponential distribution)
   and walks the network that distance in random directions, except only backtracking when confronted with
   a dead end. Another, probably better, alternative is to precalculate stray probabilities not for each
   reach a fish is currently in, but for each destination. Walk the network downstream from the destination,

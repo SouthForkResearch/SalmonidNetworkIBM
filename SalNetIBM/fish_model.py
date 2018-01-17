@@ -51,6 +51,16 @@ class FishModel(Model):
         """Advance the model by one step."""
         self.schedule.step()
 
+    def fish_with_id(self, unique_id):
+        """ Retrieves a fish by its unique_id attribute, regardless of living or dead."""
+        live_fish = [fish for fish in self.schedule.fish if fish.unique_id == unique_id]
+        if len(live_fish) == 1:
+            return live_fish[0]
+        dead_fish = [fish for fish in self.schedule.dead_fish if fish.unique_id == unique_id]
+        if len(dead_fish) == 1:
+            return dead_fish[0]
+        raise ValueError("There are {0} live fish and {1} dead fish with unique_id {2}.".format(len(live_fish), len(dead_fish), unique_id))
+
     def fish_alive_at_timestep(self, timestep):
         return [fish for fish in self.schedule.fish + self.schedule.dead_fish if
                 fish.birth_week <= timestep and fish.birth_week + fish.age_weeks > timestep]
@@ -205,20 +215,19 @@ class FishModel(Model):
         rates['Fry-to-adult survival (anadromous)'] = len(anad_adult_fish) / len(dead_fish)
         rates['Fry-to-adult survival (resident)'] = len(res_adult_fish) / len(dead_fish)
         fish_that_smolted = [fish for fish in dead_fish if
-                             fish.life_history is LifeHistory.ANADROMOUS and Activity.SMOLT_OUTMIGRATION in [item[1] for
-                                                                                                             item in
-                                                                                                             fish.activity_history]]
+                             fish.life_history is LifeHistory.ANADROMOUS
+                             and Activity.SMOLT_OUTMIGRATION in [item[2] for item in fish.activity_history]]
         fish_that_grew_in_salt = [fish for fish in fish_that_smolted if
-                                  Activity.SALTWATER_GROWTH in [item[1] for item in fish.activity_history]]
+                                  Activity.SALTWATER_GROWTH in [item[2] for item in fish.activity_history]]
         rates['Smolt-to-ocean survival'] = len(fish_that_grew_in_salt) / len(fish_that_smolted)
         fish_that_survived_salt = [fish for fish in fish_that_grew_in_salt if
-                                   Activity.SPAWNING_MIGRATION in [item[1] for item in fish.activity_history]]
+                                   Activity.SPAWNING_MIGRATION in [item[2] for item in fish.activity_history]]
         rates['Saltwater growth survival'] = len(fish_that_survived_salt) / len(fish_that_grew_in_salt)
         anad_spawners = [fish for fish in fish_that_survived_salt if
-                         fish.life_history is LifeHistory.ANADROMOUS and Activity.SPAWNING in [item[1] for item in
+                         fish.life_history is LifeHistory.ANADROMOUS and Activity.SPAWNING in [item[2] for item in
                                                                                                fish.activity_history]]
         res_spawner_migrants = [fish for fish in res_adult_fish if
-                                Activity.SPAWNING_MIGRATION in [item[1] for item in fish.activity_history]]
+                                Activity.SPAWNING_MIGRATION in [item[2] for item in fish.activity_history]]
         rates['Spawning migration survival (anadromous)'] = len(anad_spawners) / len(
             fish_that_survived_salt)  # combines failure to spawn with failure to reach spawning grounds
         rates['Survival of adulthood to spawning migration (residents)'] = len(res_spawner_migrants) / len(
