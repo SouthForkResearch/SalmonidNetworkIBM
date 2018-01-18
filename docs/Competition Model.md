@@ -7,8 +7,8 @@ The proposed algorithm described below was motivated by the following goals and 
 1. To accurately predict the effects of manipulating food and/or temperature on a population of competing individuals, we need to capture how these variables interact in bioenergetics models. Specifically, fish need more food to sustain a given growth rate at a higher temperature. Thus, at higher temperatures, dominant competitors should monopolize more of the resources, and outcompeted individuals should suffer more sharply from their famine than at colder temperatures.
 2. Fish should compete for habitat as well as food, because the availability of food to a fish in a reach depends on which parts of that reach are actually accessible to the fish for profitable foraging and how many competitors are already there.
 3. The competition model has to be extremely computationally efficient because it is referenced constantly by growing fish to see how much they'll grow and whether they should move. This means:
-    a. Ideally, fish would compete for food and habitat via a single combined metric.
-    b. We can't have each fish loop over its competitors to figure out how many there are or where it fits in. Instead, we need to manage resources within the 'network reach' objects by keeping a running tab of what's available to the fish. Fish compete by subtracting from this tab (larger/dominant fish first) rather than directly interacting. The trick is to figure out what this tab looks like.
+    1. Ideally, fish would compete for food and habitat via a single combined metric.
+    2. We can't have each fish loop over its competitors to figure out how many there are or where it fits in. Instead, we need to manage resources within the 'network reach' objects by keeping a running tab of what's available to the fish. Fish compete by subtracting from this tab (larger/dominant fish first) rather than directly interacting. The trick is to figure out what this tab looks like.
 4. Large fish shouldn't be competing with small fish, because they require different microhabitats and prey sizes. However, it's preferable not to just lump fish into size bins and only have them compete for resources or capacity within their bin. Resource needs vary continuously with fish size, and if we have enough bins to represent this continuity, we end up unrealistically isolating fish from competitors in adjacent bins. Ideally, each fish should be in competition with others within the same range of sizes.
 
 ## Proposed algorithm
@@ -39,4 +39,12 @@ To make sure these territory sizes approximate the territory sizes of real fish,
 
 ## Diagnostic metrics
 
-We'll be able to track a fish's depth, water velocity, and ration level over time.
+In addition to existing metrics like growth and temperature, we'll be able to observe each fish's depth, water velocity, and ration level over time.
+
+## Data needs
+
+Relative to other possibilities we've discussed, the needs are pretty modest:
+
+* CHaMP site data containing width, gradient, and depth/velocity availability profiles under average discharge conditions, to calibrate the statistical models for habitat availability. If we want to consider variation in discharge, we'll need that on the main Upper Salmon network as well as in the CHaMP calibration data.
+* Tables of ranked depth/velocity preferences for fish at a given size and temperature based on NREI. I have Python code from the UBC project that could be easily adapted for this purpose.
+* *O. mykiss* territory size relationships from the literature.
