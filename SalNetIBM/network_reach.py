@@ -65,9 +65,11 @@ class NetworkReach:
         return math.exp(log_gpp)
 
     def create_habitat_boxes(self):
-        """ Ideally, we just have some numbers we can subtract/add when fish enter/leave.
+        """
+            Ideally, we just have some numbers we can subtract/add when fish enter/leave.
 
-            Every fish gets food dependent on recent GPP in the area and the size of the area it inhabits.
+            Every fish gets food dependent on recent GPP in the area and the size of the area it inhabits. Maybe
+            calculate rolling_average_gpp in the step() function of the network reach.
 
             The first/largest/dominant fish gets all the space it wants, but should have little to no effect on
             smaller fish in slower/shallower microhabitats.
@@ -80,8 +82,31 @@ class NetworkReach:
             Space consists of hundreds of tiny boxes of (depth, velocity). Each fish has some range of tolerable
             depth and tolerable velocity, and it chooses the boxes within that range that would most closely maximize
             its NREI under the prevailing conditions, taking enough boxes to fill its territory size. If there aren't
-            enough boxes in the acceptable range to fill its territory size, it goes into competitive dispersal
+            enough boxes in the acceptable range to fill its territory size, it goes into competitive dispersal.
 
+            Maybe take advantage of Numpy for speed. Have a 2D array indexed by depth, velocity increments. Each reach
+            has an array of capacity indicating the 2-D geographic area within that depth/velocity increment in the reach.
+            Each element of this array is calculated from a regression on the proportion of habitat in that depth/velocity category
+            based on width, discharge, and gradient, which is then normalized to sum to 1 and multiplied by reach area.
+
+            For simplicity, let's say a fish needs to have its needs met from a single depth/velocity bin, and can't
+            spread them out across multiple bins. When a fish is selecting a 'bin', it runs down the list of acceptable
+            depth/velocity indices in descending order of preference until it finds an array element with enough
+            resource left to meet its minimum requirement.
+
+            If it can't find something to meet its requirement, it takes whatever's left from the best tolerable bin,
+            grows on that basis in the current timestep with a ration size reduced by the size of the acquired
+            territory in proportion to the normal territory, but goes into competitive dispersal for the future timesep.
+
+            What is the resource unit for competition? Territory area. How does that map onto energy intake? It needs
+            to be based on actual vs preferred area as well as some relationship with GPP.
+
+            But how do we reproduce the competitive dynamic that when temperature is higher, fish need more food to
+            grow the same amount, and this should reduce availability of food to the other fish? Maximum ration is iirc
+            temperature-dependent. We could make territory size dependent on maximum ration via a linear relationship
+            that includes GPP. This is where we would stick some calibration knobs to tweak.
+
+            territory_size = f(fish_size, max_ration, GPP)
         """
         pass
 

@@ -1,8 +1,7 @@
 # Features to add
 
 ## Visualization and outputs
-* Make an easy way to examine metrics for a particular network reach over time. Then use it to figure out 
-  why the tributaries are being so under-utilized.
+* Make an easy way to examine metrics for a particular network reach over time. Then use it to figure out why the tributaries are being so under-utilized.
 * Write some code to summarize output from multiple model runs in a way comparable to Matt's summaries
   of the other LCM.
 * Do population size summaries by maturity/life history and activity/life history.
@@ -14,25 +13,14 @@
 * Build in "smart" random movement that doesn't get stuck at tips, makes turns sometimes, maybe prioritizes temperature.
 * Build in functionality for population groups -- should be in shapefile already, maybe a 6-7 letter code
 * Test the latest network version with text fields in it.
+* Stream discharge isn't in the model, and we certainly don't have any way to simulate temporal variation in discharge yet.
 
 ## Biology
 * Add additional variation in spawner run timing (when they leave the ocean, how fast they move).
-* Current mechanisms don't reflect known steelhead extent at all (straying and other movements, as well as
-  random life history switching.)
+* Current mechanisms don't reflect known steelhead extent at all (straying and other movements, as well as random life history switching.)
 * We currently have very simplistic straying mechanisms. Females that find their spawning reach already
-  at capacity become strays. Also, all fish have a very low chance at birth to be assigned a spawning reach different from their natal reach, but the new reach is selected at random from the whole network. Eventually, I could have a system that randomly generates a straying distance (exponential distribution)
-  and walks the network that distance in random directions, except only backtracking when confronted with
-  a dead end. Another, probably better, alternative is to precalculate stray probabilities not for each
-  reach a fish is currently in, but for each destination. Walk the network downstream from the destination,
-  find all the wrong turns a fish could make when going upstream, and assign a probability to each of
-  them based on stream order. When a fish born in one of those reaches is drawn for "destined to stray",
-  it is assigned (destined from birth) to make one of these wrong turns. If it then actually survives to
-  make the spawning migration, it is (somehow -- figure this out) assigned a natal reach upstream of the
-  wrong turn somewhere, and/or guided to the wrong turn and turned into a random upstream migrant.
-* Fall warmth-seeking creates net movement downstream; we need to create upstream movement eventually to 
-  offset it. However, the temperatures are so low right now that nowhere on the network has the "warm" water
-  the fish are seeking during these weeks. Currently, this mechanism is disabled altogether. Summer
-  cold-seeking is never triggered by the current network temperatures at all.
+  at capacity become strays. Also, all fish have a very low chance at birth to be assigned a spawning reach different from their natal reach, but the new reach is selected at random from the whole network. Eventually, I could have a system that randomly generates a straying distance (exponential distribution) and walks the network that distance in random directions, except only backtracking when confronted with a dead end. Another, probably better, alternative is to precalculate stray probabilities not for each reach a fish is currently in, but for each destination. Walk the network downstream from the destination, find all the wrong turns a fish could make when going upstream, and assign a probability to each of them based on stream order. When a fish born in one of those reaches is drawn for "destined to stray", it is assigned (destined from birth) to make one of these wrong turns. If it then actually survives to make the spawning migration, it is (somehow -- figure this out) assigned a natal reach upstream of the wrong turn somewhere, and/or guided to the wrong turn and turned into a random upstream migrant.
+* Fall warmth-seeking creates net movement downstream; we need to create upstream movement eventually to  offset it. However, the temperatures are so low right now that nowhere on the network has the "warm" water the fish are seeking during these weeks. Currently, this mechanism is disabled altogether. Summer cold-seeking is never triggered by the current network temperatures at all.
 * Ideally, prey availability would lag behind GPP.
             
 ## Speed/memory optimizations
@@ -43,8 +31,7 @@
   is_small, is_medium, is_mature attributes updated only when they change.
 
 ## User-friendliness
-* Eventually have the settings read from a CSV file rather than hard-coded dictionaries. The code was set up
-  to make this a very easy transition.
+* Eventually have the settings read from a CSV file rather than hard-coded dictionaries. The code was set up to make this a very easy transition.
   
 # Problems to fix
 

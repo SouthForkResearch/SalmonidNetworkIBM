@@ -88,6 +88,25 @@ def generate_report(self, movies=True, passage=True, individuals=10):
 generate_report(test_model, movies=False, passage=True, individuals=0)
 
 
+import numpy as np
+import shutil
+def create_movie(self, frame_function, movie_name, attr):
+    """ The frame_function should be a function that takes one parameter (frame) and return a figure."""
+    temp_path = os.path.join(export_settings['RESULTS_PATH'], "temp_video_frames_533016")
+    frame_paths = []
+    for step in np.arange(1, self.schedule.steps):
+        frame_paths.append(os.path.join(temp_path, "frame {0:07d}.png".format(step)))
+    print("Making individual-frame movie 'clips' from exported files.")
+    # clips = [ImageClip(fp).set_duration(1 / 30) for fp in frame_paths]
+    clips = [ImageClip(fp) for fp in frame_paths]
+    print("Concatenating frames into final video.")
+    concat_clip = concatenate_videoclips(clips, method="compose")
+    print("Writing final video file.")
+    concat_clip.write_videofile(os.path.join(export_settings['RESULTS_PATH']), movie_name + '.mp4', fps=30)
+    shutil.rmtree(temp_path, ignore_errors=True)
+    print("Finished exporting {0}.mp4.".format(movie_name))
+create_movie(test_model, test_model.population_videoframe_function, 'Total Population', 'population')
+
 # fish 117947: going from reach 478 to seek reach 478 for spawning, somehow ends up in reach 498, doesn't spawn, gets stuck for 3 years
 # fish 146035: somehow jumps from the ocean to the headwaters (reach 3022) instantly during its second / kelt spawning run
 

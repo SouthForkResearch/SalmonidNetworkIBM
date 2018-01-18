@@ -285,7 +285,7 @@ class FishModel(Model):
         print("Concatenating frames into final video.")
         concat_clip = concatenate_videoclips(clips, method="compose")
         print("Writing final video file.")
-        concat_clip.write_videofile(os.path.join(export_settings['RESULTS_PATH']), movie_name + '.mp4', fps=30)
+        concat_clip.write_videofile(os.path.join(export_settings['RESULTS_PATH']), movie_name + '.mp4')#, fps=30)
         shutil.rmtree(temp_path, ignore_errors=True)
         print("Finished exporting {0}.mp4.".format(movie_name))
 
