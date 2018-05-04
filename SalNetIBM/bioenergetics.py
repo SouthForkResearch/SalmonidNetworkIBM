@@ -3,13 +3,13 @@ from numba import jit
 
 CA = 0.628
 CB = -0.3
-RA = 0.013
+RA = 0.013     # (g / g) / day
 RB = -0.217
 ACT = 1.3
 SDA = 0.172
 EDO2 = 13562
-EDprey = 3636  # Differs from original value of 2500 based on my energy density calculations
-EDpred = 5900
+EDprey = 3636  # J / g wet mass ; Differs from original value of 2500 based on my energy density calculations
+EDpred = 5900  # J / g wet mass
 Ck1 = 0.2
 Ck4 = 0.2
 CQ = 3.5
@@ -56,9 +56,23 @@ def f4(T):
 
 
 @jit(nopython=True)
-def daily_growth(T, W, p):
+def daily_growth_from_p(T, W, p):
+    # Returns daily growth from p, the proportion of the fish's maximum ration it obtains
     return (1 / EDpred) * ((EDprey * CA * W ** CB * p * f1(T)) * (1 - (FA * f3(T) * np.exp(FG * p)))
                            * (1 - SDA - UA * f4(T) * np.exp(UG * p)) - (RA * ACT * EDO2 * W ** RB * f2(T)))
+
+@jit(nopython=True)
+def daily_growth_from_grams_consumed(T, W, C_g):
+    # Takes temperature T (degrees C), fish mass W (g), and actual grams consumed (g/day) and returns daily specific growth
+    p = min(1, C_g / (W * CA * W ** CB * f1(T)))
+    return (1 / EDpred) * ((EDprey * CA * W ** CB * p * f1(T)) * (1 - (FA * f3(T) * np.exp(FG * p)))
+                           * (1 - SDA - UA * f4(T) * np.exp(UG * p)) - (RA * ACT * EDO2 * W ** RB * f2(T)))
+
+@jit(nopython=True)
+def daily_grams_consumed_from_p(T, W, p):
+    # Takes temperature T (degrees C), fish mass W (g), and p-value, and returns consumption in (g/day), not the
+    # usual g/g/day used for the 'C' term in the bioenergetics model.s
+    return W * CA * W ** CB * p * f1(T)
 
 
 @jit(nopython=True)

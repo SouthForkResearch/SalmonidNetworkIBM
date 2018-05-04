@@ -1,8 +1,13 @@
 import math
+import pickle
 import random
 import shapefile  # from 'pyshp' library
 import numpy as np
+import pandas as pd
+import statsmodels.tools as st
+import statsmodels.formula.api as sm
 import csv
+import os
 import sys
 import datetime
 from bokeh.models import LinearColorMapper, LogColorMapper, ColorBar, HoverTool, Label, Span, Axis, NumeralTickFormatter
@@ -12,6 +17,7 @@ from bokeh.plotting import figure
 from .fish import Movement, LifeHistory
 from .settings import network_settings, time_settings
 from .network_reach import NetworkReach
+from .betareg import Beta
 
 class StreamNetwork:
     """ The network is represented as a collection of reaches. """
@@ -20,6 +26,15 @@ class StreamNetwork:
         self.model = model
         self.reaches = []
         self.history = []
+        # Initialize the habitat availability model
+        self.velocity_depth_regression_data = pickle.load(
+            open("/Users/Jason/Dropbox/SFR/Projects/2018-02 NetworkHabitat/velocity_depth_regression_data.pickle",
+                 "rb"))
+        self.zmodels = {}  # logistic regression for probability that proportion is nonzero
+        self.bmodels = {}
+        self.zfits = {}
+        self.bfits = {}
+        self.load_depth_velocity_regressions()
         print("Loading network shapefile.")
         # Create the shapefile reader and load the names of its fields
         sf = shapefile.Reader(network_settings['SHAPEFILE'])
@@ -101,6 +116,17 @@ class StreamNetwork:
         self.ocean_reach.points = [(-1415000, 759943), (-1400000, 759943)]
         self.ocean_reach.calculate_midpoint()
         self.reaches.append(self.ocean_reach)
+        # Calculate predicted mean annual GPP (as actual value and percentile) for each reach
+        print("Calculating GPP percentiles.")
+        for reach in self.reaches:
+            reach.set_mean_gpp()
+        all_gpps = np.array([reach.mean_gpp for reach in self.reaches])
+        all_gpp_percentiles = (all_gpps < all_gpps[:, None]).mean(axis=1)
+        for reach, percentile in zip(self.reaches, all_gpp_percentiles):
+            reach.mean_gpp_percentile = percentile
+            reach.food_production = 1.5 + percentile  # food production in g/m2/day, ranges from 1.5 to 2.5 based on gpp percentile
+        # Load habitat preferences (does its own printing)
+        self.load_habitat_preferences()
         print("Network loading complete.")
 
     def step(self, timestep):
@@ -133,6 +159,56 @@ class StreamNetwork:
                 print("No reach with ID ", id)
         else:
             return reaches[0]
+
+    def load_depth_velocity_regressions(self):
+        # Somewhere this function generates annoying "Optimization terminated successfully." printouts and I'm not sure where.
+        print("Importing data for reach depth/velocity availability regressions.")
+        for key, data in self.velocity_depth_regression_data.items():
+            print("Processing regressions for ", key)
+            try:
+                df = pd.DataFrame(data=data, index=np.arange(len(data)),
+                                  columns=['proportion', 'hits', 'misses', 'gradient', 'width'])
+                df['nonzero'] = df.apply(lambda row: 0 if row['proportion'] == 0 else 1, axis=1)
+                df['intercept'] = df.apply(lambda row: 1, axis=1)
+                df_nonzero = df.loc[df['nonzero'] == 1]
+                if 0 < len(df_nonzero) < len(df):
+                    self.zmodels[key] = sm.Logit.from_formula('nonzero ~ gradient + width', data=df)
+                    self.zfits[key] = self.zmodels[key].fit()
+                    self.bmodels[key] = Beta.from_formula('proportion ~ gradient + width', data=df_nonzero)  # does intercept automatically, despite documentation to the contrary
+                    self.bfits[key] = self.bmodels[key].fit()
+                elif len(df_nonzero) == len(df):
+                    self.bmodels[key] = Beta.from_formula('proportion ~ gradient + width', data=df_nonzero)  # does intercept automatically, despite documentation to the contrary
+                    self.bfits[key] = self.bmodels[key].fit()
+            except st.sm_exceptions.PerfectSeparationError:
+                print("PerfectSeparationError for key ", key)
+        print("Completed import of depth/velocity availability regressions.")
+
+    def load_habitat_preferences(self):
+        # Loads a dictionary of habitat preferences, keyed by temperature and fork length, based on NREI modeling in an external program.
+
+        def habitat_preferences_from_file(habitat_pref_file):
+            df = pd.read_csv(habitat_pref_file, index_col=0, dtype={'INDEX': np.float64})
+            habitat_prefs = []
+            for velocity in df.index:
+                for depth in df.loc[velocity].index:
+                    nrei = df.loc[velocity].loc[str(depth)]
+                    if nrei > 0:
+                        label = "{0}_{1:.1f}".format(depth, velocity)
+                        habitat_prefs.append((label, nrei))
+            return sorted(habitat_prefs, key=lambda x: -x[1])
+        print("Loading a library of habitat preferences from NREI modeling results.")
+        habitat_preferences = {}
+        nrei_folder = network_settings['NREI_BATCH_FOLDER']
+        for root, dirs, filenames in os.walk(nrei_folder):
+            for filename in filenames:
+                label_parts = filename.split(' ')[0].split('_')
+                temperature = int(label_parts[1])
+                fork_length = float(label_parts[3])
+                if temperature not in habitat_preferences.keys():
+                    habitat_preferences[temperature] = {}
+                habitat_preferences[temperature][fork_length] = habitat_preferences_from_file(os.path.join(nrei_folder, filename))
+        self.habitat_preferences = habitat_preferences
+        print("Finished loading habitat preference library.")
 
     def season_label(self, history_step):
         week_of_year = history_step % time_settings['WEEKS_PER_YEAR']

@@ -61,6 +61,12 @@ class FishModel(Model):
             return dead_fish[0]
         raise ValueError("There are {0} live fish and {1} dead fish with unique_id {2}.".format(len(live_fish), len(dead_fish), unique_id))
 
+    def random_live_fish(self):
+        return random.choice(self.schedule.fish)
+
+    def random_dead_fish(self):
+        return random.choice(self.schedule.dead_fish)
+
     def fish_alive_at_timestep(self, timestep):
         return [fish for fish in self.schedule.fish + self.schedule.dead_fish if
                 fish.birth_week <= timestep and fish.birth_week + fish.age_weeks > timestep]
@@ -285,7 +291,7 @@ class FishModel(Model):
         print("Concatenating frames into final video.")
         concat_clip = concatenate_videoclips(clips, method="compose")
         print("Writing final video file.")
-        concat_clip.write_videofile(os.path.join(export_settings['RESULTS_PATH']), movie_name + '.mp4')#, fps=30)
+        concat_clip.write_videofile(os.path.join(export_settings['RESULTS_PATH']), movie_name + '.mp4', fps=30, codec='mpeg4')
         shutil.rmtree(temp_path, ignore_errors=True)
         print("Finished exporting {0}.mp4.".format(movie_name))
 

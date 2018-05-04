@@ -1,14 +1,20 @@
 import math
 import sys
+import os
 import numpy as np
+import pandas as pd
 import functools
+import copy
+import pickle
+from bokeh.plotting import figure
 from .fish import LifeHistory
+from .settings import network_settings
 
 
 class NetworkReach:
     """ The network is represented as a collection of reaches. """
 
-    def __init__(self, network, attribs, points, from_node, to_node):
+    def __init__(self, network, attribs, points, from_node, to_node, **kwargs):
         self.network = network
         self.id = attribs['LineOID']
         self.from_node = from_node
@@ -22,6 +28,7 @@ class NetworkReach:
         self.strahler_order = attribs['strm_ord']
         self.spring95 = attribs['Winter95']  # SPRING95 ISN'T IN THE NETWORK
         self.area = self.length_m * self.bank_full_width  # area is in m2
+        self.wetted_area = self.area * 0.7  # MADE UP NUMBER, REPLACE ASAP
         self.capacity_redds = attribs['rdd_M2'] * self.area
         self.area_solar = attribs['area_solar']
         self.conductivity = attribs['prdCond']
@@ -29,6 +36,7 @@ class NetworkReach:
         self.huc10_name = attribs['HUC10NmNRC']
         self.huc12_name = attribs['HUC12NmNRC']
         self.gradient = attribs['GRADIENT']
+        self.population_code = attribs['STHDLABEL']
         self.is_within_steelhead_extent = (attribs['steel_anad'] == 1)
         self.is_ocean = False
         self.is_migration_reach = False
@@ -43,9 +51,17 @@ class NetworkReach:
         self.medium_fish_spots_available = self.capacity_medium_fish
         self.history = []
         self.calculate_midpoint()
+        self.mean_gpp = None                # placeholder, calculated by network after building all reaches
+        self.mean_gpp_percentile = None     # same
+        self.food_production = None         # same. units are g dry mass produced per m2 per day
+        self.initial_habitat_available = self.predict_habitat_areas(**kwargs)
+        self.current_food_availability = copy.deepcopy(self.initial_habitat_available)
 
     def set_temperatures(self, temperatures):
         self.temperatures = temperatures
+
+    def set_mean_gpp(self): # has to be run after set_temperatures
+        self.mean_gpp = np.array([self.gpp_at_week(week) for week in list(np.arange(1, 49))]).mean()
 
     def temperature_at_week(self, week_of_simulation):
         """ Input the week of the simulation, not week of year. Temperatures from the input file are
@@ -61,54 +77,56 @@ class NetworkReach:
     @functools.lru_cache(maxsize=None)
     def gpp_at_week(self, week_of_simulation):
         temperature = self.temperature_at_week(week_of_simulation)
-        log_gpp = -11.538 + 0.00827 * self.conductivity + 4.11e-6 * self.area_solar + 0.538 * temperature
+        # capping conductivity at 350 here because max real value was 345 in our network; had one glitch value over 100,000
+        log_gpp = -11.538 + 0.00827 * min(self.conductivity, 350) + 4.11e-6 * self.area_solar + 0.538 * temperature
         return math.exp(log_gpp)
 
-    def create_habitat_boxes(self):
-        """
-            Ideally, we just have some numbers we can subtract/add when fish enter/leave.
+    def gpp_plot(self):
+        # Survival function plot (based on dead fish only)
+        x = list(np.arange(1, 49))
+        y = [self.gpp_at_week(week) for week in x]
+        fig = figure(plot_width=400, plot_height=300, toolbar_location='above')
+        fig.xaxis.axis_label = 'Week of simulation'
+        fig.yaxis.axis_label = 'GPP'
+        fig.line(x, y, line_width=1, legend='GPP', line_color='forestgreen')
+        fig.legend.location = 'top_right'
+        fig.toolbar.logo = None
+        return fig
 
-            Every fish gets food dependent on recent GPP in the area and the size of the area it inhabits. Maybe
-            calculate rolling_average_gpp in the step() function of the network reach.
+    def predict_raw_habitat_proportions(self, dvkey, gradient, width):
+        if dvkey in self.network.zfits.keys() and dvkey in self.network.bfits.keys():
+            bprop = self.network.bmodels[dvkey].jrn_predict(self.network.bfits[dvkey].params[:-1], np.array([1, gradient, width]))
+            temp_df = pd.DataFrame(data=[[gradient, width]], index=[0, 1], columns=['gradient', 'width'])
+            zprop = self.network.zfits[dvkey].predict(temp_df)[0]
+            return bprop * zprop
+        elif dvkey in self.network.bfits.keys():
+            bprop = self.network.bmodels[dvkey].jrn_predict(self.network.bfits[dvkey].params[:-1], np.array([1, gradient, width]))
+            zprop = 1
+            return bprop * zprop
+        else:
+            return 0
 
-            The first/largest/dominant fish gets all the space it wants, but should have little to no effect on
-            smaller fish in slower/shallower microhabitats.
+    def predict_normalized_habitat_proportions(self, gradient, width):
+        vals = np.array([(key, self.predict_raw_habitat_proportions(key, gradient, width)) for key in self.network.velocity_depth_regression_data.keys()],
+                        dtype=[('depth_velocity', np.unicode_, 7), ('proportion', np.float64)])
+        vals['proportion'] = vals['proportion'] / vals['proportion'].sum()
+        return dict(list(vals))
 
-            The "boxes" available depend on the fish trying to inhabit them. Smaller fish take up less space. So
-            we want some indicator of territory size.
-
-            How do we have fish of different sizes competing for different "pools" of space?
-
-            Space consists of hundreds of tiny boxes of (depth, velocity). Each fish has some range of tolerable
-            depth and tolerable velocity, and it chooses the boxes within that range that would most closely maximize
-            its NREI under the prevailing conditions, taking enough boxes to fill its territory size. If there aren't
-            enough boxes in the acceptable range to fill its territory size, it goes into competitive dispersal.
-
-            Maybe take advantage of Numpy for speed. Have a 2D array indexed by depth, velocity increments. Each reach
-            has an array of capacity indicating the 2-D geographic area within that depth/velocity increment in the reach.
-            Each element of this array is calculated from a regression on the proportion of habitat in that depth/velocity category
-            based on width, discharge, and gradient, which is then normalized to sum to 1 and multiplied by reach area.
-
-            For simplicity, let's say a fish needs to have its needs met from a single depth/velocity bin, and can't
-            spread them out across multiple bins. When a fish is selecting a 'bin', it runs down the list of acceptable
-            depth/velocity indices in descending order of preference until it finds an array element with enough
-            resource left to meet its minimum requirement.
-
-            If it can't find something to meet its requirement, it takes whatever's left from the best tolerable bin,
-            grows on that basis in the current timestep with a ration size reduced by the size of the acquired
-            territory in proportion to the normal territory, but goes into competitive dispersal for the future timesep.
-
-            What is the resource unit for competition? Territory area. How does that map onto energy intake? It needs
-            to be based on actual vs preferred area as well as some relationship with GPP.
-
-            But how do we reproduce the competitive dynamic that when temperature is higher, fish need more food to
-            grow the same amount, and this should reduce availability of food to the other fish? Maximum ration is iirc
-            temperature-dependent. We could make territory size dependent on maximum ration via a linear relationship
-            that includes GPP. This is where we would stick some calibration knobs to tweak.
-
-            territory_size = f(fish_size, max_ration, GPP)
-        """
-        pass
+    def predict_habitat_areas(self, **kwargs):
+        cache_file_path = os.path.join(network_settings['MICROHABITAT_MODEL_CACHE_PATH'], "reach_{0}.pickle".format(self.id))
+        directory = os.path.dirname(cache_file_path)
+        if not os.path.exists(directory):
+            os.makedirs(directory)
+        if os.path.isfile(cache_file_path) and not kwargs.get('force_recalculate_microhabitat', False):
+            with open(cache_file_path, 'rb') as file:
+                habitat_areas = pickle.load(file)
+        else:
+            print("Predicting microhabitat proportions available for reach {0}".format(self.id))
+            proportions_dict = self.predict_normalized_habitat_proportions(self.gradient, self.bank_full_width)
+            habitat_areas = {key: value * self.wetted_area for key, value in proportions_dict.items()}
+            with open(cache_file_path, 'wb') as file:
+                pickle.dump(habitat_areas, file)
+        return habitat_areas
 
     def calculate_midpoint(self):
         npoints = len(self.points)
@@ -121,6 +139,7 @@ class NetworkReach:
 
     def step(self, timestep):
         # could also speed things up by flagging whether any fish died and not doing the 2 lines below if nothing died
+        self.current_food_availabile = copy.deepcopy(self.initial_habitat_available)
         self.small_fish_spots_available = self.capacity_small_fish
         self.medium_fish_spots_available = self.capacity_medium_fish
         self.small_fish_count = len([fish for fish in self.fish if fish.is_small])

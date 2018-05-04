@@ -19,10 +19,14 @@ network_settings = dict(
     LEMHI_MOUTH=1627,
     PAHSIMEROI_MOUTH=2242,
     YANKEE_FORK_MOUTH=3760,
-    SHAPEFILE=os.path.join(BASE_DIRECTORY, 'Projects', 'SalmonidNetworkIBM', 'Network', 'SalmonNetwork_R1_20171018.shp'),
+    #SHAPEFILE=os.path.join(BASE_DIRECTORY, 'Projects', 'SalmonidNetworkIBM', 'Network', 'SalmonNetwork_R1_20171018.shp'),
+    MICROHABITAT_MODEL_CACHE_PATH=os.path.join(BASE_DIRECTORY, 'Projects', 'SalmonidNetworkIBM', 'Network', 'Microhabitat_Model_Cache'),
+    MICROHABITAT_PREFERENCE_CACHE_PATH=os.path.join(BASE_DIRECTORY, 'Projects', 'SalmonidNetworkIBM', 'resources', 'nrei_batch_results'),
+    SHAPEFILE=os.path.join(BASE_DIRECTORY, 'Projects', 'SalmonidNetworkIBM', 'Network', 'G_SalmonNetwork_R1_TextFields_20171206.shp'),
     NODE_RELATIONSHIP_FILE=os.path.join(BASE_DIRECTORY, 'Projects', 'SalmonidNetworkIBM', 'Network', 'Salmon_noderelationship_20171003.dbf'),
     #TEMPERATURE_FILE=os.path.join(BASE_DIRECTORY, 'UpperSalmon', 'HexSim', 'RipVeg', '2013', 'Mean', 'USal_2013_8D_pot_Mn.shp'),  # restoration 2013 temps
-    TEMPERATURE_FILE=os.path.join(BASE_DIRECTORY, 'UpperSalmon', 'HexSim', 'RipVeg', '2013', 'Mean', 'USal_2013_8D_curr_Mn.shp')  # regular 2013 temps
+    TEMPERATURE_FILE=os.path.join(BASE_DIRECTORY, 'UpperSalmon', 'HexSim', 'RipVeg', '2013', 'Mean', 'USal_2013_8D_curr_Mn.shp'),  # regular 2013 temps
+    NREI_BATCH_FOLDER=os.path.join(BASE_DIRECTORY, 'Projects', 'SalmonidNetworkIBM', 'resources', 'nrei_batch_results')
 )
 
 spawning_settings = dict(

@@ -23,13 +23,13 @@ The values in the array are calculated for each network reach using statistical 
 
 Both currently and under this new competition model, fish are sorted by size at the beginning of every timestep. The model iterates through them in this order in each timestep, meaning the largest, most dominant fish get first access to limited resources.
 
-Each fish has a list of acceptable depth/velocity combinations for foraging, ranked in order of preference as determined by potential NREI. (Precalculated preference tables for size classes or size class / temperature combinations will negate the need to calculate actual NREIs.) When a fish's turn arrives to take up resources (surface area), it takes up the space it needs (its territory) from the most preferable depth/velocity matrix cell that still has that amount of space available. The space it uses it then subtracted from the table of what's available for the remaining, less dominant fish. 
+Each fish has a list of acceptable depth/velocity combinations for foraging, ranked in order of preference as determined by potential NREI. (Precalculated preference tables for size classes or size class / temperature combinations will negate the need to calculate actual NREIs.) When a fish's turn arrives to take up resources (surface area), it takes up the space it needs (its territory) from the most preferable depth/velocity matrix cell that still has that amount of space available. The space it uses is then subtracted from the table of what's available for the remaining, less dominant fish.
 
 If no acceptable table entry contains the appropriate amount of space, the fish takes up all the remaining space in the most preferable depth/velocity matrix cell with nonzero remaining space. However, its ration level is reduced in proportion to the ratio of space available to space desired, and it is flagged to begin competitive dispersal movements in the next timestep.
 
 ### Relationship between space and food
 
-We don't have any way to calculate actual food available based on drift density or depletion of drift by upstream competitors within the reach, so we instead look for a simplified relationship that satisfies requirement #1 using data available to us.
+We don't have any way to calculate actual food available bafsed on drift density or depletion of drift by upstream competitors within the reach, so we instead look for a simplified relationship that satisfies requirement #1 using data available to us.
 
 We develop a relationship to infer food production per unit area in each network reach from gross primary productivity (GPP), which we already have modeled across the network. (I'll address how we do this shortly.) We ignore the fact that food drifts in from upstream and assume fish capture all the local production in their territory instead. A rolling average of GPP might be a better proxy for food production than instantaneous GPP.
 
@@ -45,6 +45,12 @@ In addition to existing metrics like growth and temperature, we'll be able to ob
 
 Relative to other possibilities we've discussed, the needs are pretty modest:
 
+* Figure out bankful to wetted width relationships, maybe wetted width data layer.
 * CHaMP site data containing width, gradient, and depth/velocity availability profiles under average discharge conditions, to calibrate the statistical models for habitat availability. If we want to consider variation in discharge, we'll need that on the main Upper Salmon network as well as in the CHaMP calibration data.
 * Tables of ranked depth/velocity preferences for fish at a given size and temperature based on NREI. I have Python code from the UBC project that could be easily adapted for this purpose.
 * *O. mykiss* territory size relationships from the literature.
+
+## For restoration over the network
+
+* Create new depth/velocity rasters from hydro model for a bunch of sites representing restored sites
+* Just generate new "restored reach" regressions for habitat availability from the above, and be able to flip a switch to apply restoration to any reach we want, or all of them.

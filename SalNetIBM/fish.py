@@ -6,7 +6,7 @@ from bokeh.plotting import figure
 import numpy as np
 
 from .settings import time_settings, resident_fish_settings, anadromous_fish_settings, spawning_settings
-from .bioenergetics import daily_growth, mass_at_length, length_at_mass
+from .bioenergetics import daily_growth_from_p, mass_at_length, length_at_mass
 
 from enum import Enum, auto
 
@@ -149,6 +149,16 @@ class Fish(Agent):
     @property
     def age_years(self):
         return self.age_weeks / time_settings['WEEKS_PER_YEAR']
+
+    def current_habitat_preferences(self):
+        temperature_key = int(round(self.temperature))
+        if temperature_key < 1:
+            temperature_key = 1
+        if temperature_key > 20:
+            temperature_key = 20
+        lengths_for_temperature = np.array(list(self.network_reach.network.habitat_preferences[temperature_key].keys()))
+        length_key = lengths_for_temperature[(np.abs(lengths_for_temperature - self.fork_length)).argmin()]
+        return self.network_reach.network.habitat_preferences[temperature_key][length_key]
 
     def step(self):
         if self.model.schedule.week_of_year == 0:
@@ -428,7 +438,7 @@ class Fish(Agent):
     def grow(self, override_p=None):
         if not self.network_reach.is_ocean:
             p = self.p if override_p is None else override_p  # allows overriding normal p-value for special situations
-            dg = daily_growth(self.temperature, self.mass, p)
+            dg = daily_growth_from_p(self.temperature, self.mass, p)
             weekly_growth_multiplier = (1 + dg) ** time_settings['DAYS_PER_WEEK']
             self.mass = self.mass * weekly_growth_multiplier
             if self.mass > self.lifetime_maximum_mass:
