@@ -14,6 +14,7 @@
 * Stream discharge isn't in the model, and we certainly don't have any way to simulate temporal variation in discharge yet.
 
 ## Biology
+* The first generation of fish is currently born January 1st, unrealistically.
 * We currently have very simplistic straying mechanisms. Females that find their spawning reach already
   at capacity become strays. Also, all fish have a very low chance at birth to be assigned a spawning reach different from their natal reach, but the new reach is selected at random from the whole network. Eventually, I could have a system that randomly generates a straying distance (exponential distribution) and walks the network that distance in random directions, except only backtracking when confronted with a dead end. Another, probably better, alternative is to precalculate stray probabilities not for each reach a fish is currently in, but for each destination. Walk the network downstream from the destination, find all the wrong turns a fish could make when going upstream, and assign a probability to each of them based on stream order. When a fish born in one of those reaches is drawn for "destined to stray", it is assigned (destined from birth) to make one of these wrong turns. If it then actually survives to make the spawning migration, it is (somehow -- figure this out) assigned a natal reach upstream of the wrong turn somewhere, and/or guided to the wrong turn and turned into a random upstream migrant.
 * Find a some realistic numbers for mass loss before starvation mortality begins.

@@ -6,7 +6,7 @@ from bokeh.plotting import figure
 import numpy as np
 
 from .settings import time_settings, resident_fish_settings, anadromous_fish_settings, spawning_settings
-from .bioenergetics import daily_growth_from_p, mass_at_length, length_at_mass
+from .bioenergetics import daily_growth_from_p, mass_at_length, length_at_mass, daily_grams_consumed_from_p
 
 from enum import Enum, auto
 
@@ -43,15 +43,21 @@ class Movement(Enum):
     SEEKING_SPAWNING_REACH = auto()
     SEEKING_HOME_REACH = auto()
 
+class SpawnStatus(Enum):
+    NOT_TRYING_TO_SPAWN = auto()
+    SEEKING_SPAWNING_REACH = auto()
+    AWAITING_MATE = auto()
+
+
 class Fish(Agent):
     """ A single O. mykiss individual."""
     def __init__(self, unique_id, model, network_reach, life_history, redd):
         super().__init__(unique_id, model)
         self.network_reach = network_reach
-        self.network_reach.fish.append(self)
         self.natal_reach = network_reach  # should never change
         self.spawning_reach = network_reach  # usually stays as natal reach, but can change to stray
         self.home_reach = network_reach  # home reach for feeding residents
+        self.network_reach.fish.append(self)
         self.life_history = life_history
         if life_history is LifeHistory.ANADROMOUS and (random.random() < spawning_settings['STRAY_PROBABILITY']
                                                        or not self.spawning_reach.is_within_steelhead_extent):
@@ -73,12 +79,12 @@ class Fish(Agent):
         self.ocean_entry_week = None
         self.ocean_age_weeks = 0
         self.mortality_reason = None
-        self.p = 0.4 + 0.05 * random.normalvariate(0, 1)
+        self.preferred_p = 0.45 + 0.05 * random.normalvariate(0, 1)    # how much food this fish wants to get; varied based individual metabolic variation
+        self.p = self.preferred_p                                      # how much food it actually gets in each timestep based on territories
         self.settings = resident_fish_settings if self.is_resident else anadromous_fish_settings
         self.should_spawn_this_year = False
         self.has_spawned_this_year = False
-        self.is_small = True
-        self.is_medium = False
+        self.is_being_outcompeted = False
         self.is_dead = False  # flag used to mark fish when they die, for more efficient mass deletion once per timestep
 
         self.activity = Activity.FRESHWATER_GROWTH
@@ -96,6 +102,27 @@ class Fish(Agent):
         self.mass_history = []
         self.length_history = []
         self.temperature_history = []
+        self.p_history = []
+        self.space_use_history = [("initialization", np.nan)]  # depth, velocity, territory size
+
+    def reconnect_from_pickling(self, model):
+        self.model = model
+        self.network_reach = self.model.network.reach_with_id(self.network_reach_id)
+        self.natal_reach = self.model.network.reach_with_id(self.natal_reach_id)
+        self.spawning_reach = self.model.network.reach_with_id(self.spawning_reach_id)
+        self.home_reach = self.model.network.reach_with_id(self.home_reach_id)
+
+    def disconnect_for_pickling(self):  # To avoid object reference recursion that stymies pickling of dead fish
+        self.network_reach_id = self.network_reach.id
+        self.natal_reach_id = self.natal_reach.id
+        self.spawning_reach_id = self.spawning_reach.id
+        self.home_reach_id = self.home_reach.id
+        self.current_route = None
+        self.network_reach = None
+        self.natal_reach = None
+        self.spawning_reach = None
+        self.home_reach = None
+        self.model = None
 
     @property
     def event_log_index(self):
@@ -177,7 +204,7 @@ class Fish(Agent):
                     else:
                         self.should_spawn_this_year = True
 
-        # Record history
+        # Record history, except p_history, which is recorded in grow()
         self.length_history.append(self.fork_length)
         self.mass_history.append(self.mass)
         self.temperature_history.append(self.temperature)
@@ -193,11 +220,8 @@ class Fish(Agent):
 
         if self.activity in (Activity.FRESHWATER_GROWTH, Activity.SALTWATER_GROWTH,
                              Activity.SUMMER_COLD_SEEKING, Activity.FALL_WARMTH_SEEKING,
-                             Activity.RANDOM_DISPERSAL):
+                             Activity.RANDOM_DISPERSAL, Activity.COMPETITIVE_DISPERSAL):
             self.grow()  # should smolts be growing, too?
-
-        elif self.activity is Activity.COMPETITIVE_DISPERSAL:
-            self.grow(self.settings['DISPLACED_FISH_RATION_FACTOR'] * self.p)  # fish being displaced by competitors get less food than usual
 
         self.possible_mortality()
 
@@ -226,7 +250,7 @@ class Fish(Agent):
                 and self.model.schedule.week_of_year_is_within(self.settings['SUMMER_COLD_SEEKING_START'],
                     self.settings['SUMMER_COLD_SEEKING_END']):
             self.set_activity(Activity.SUMMER_COLD_SEEKING)
-            cold_seeking_rate = 0.4 if self.is_small else 1.0  # approximates Yoy/OnePlus division in HexSim
+            cold_seeking_rate = 0.4 if self.age_years < 1 else 1.0
             self.set_movement(Movement.UPSTREAM, cold_seeking_rate)
 
         elif self.activity is Activity.SUMMER_COLD_SEEKING \
@@ -253,10 +277,9 @@ class Fish(Agent):
         #     self.set_activity(Activity.FRESHWATER_GROWTH)
         #     self.set_movement(Movement.STATIONARY)
 
-        # A small proportion of freshwater fish randomly disperse during week 37
+        # A small proportion of freshwater fish randomly disperse on any given week
 
         elif self.activity is Activity.FRESHWATER_GROWTH \
-                and self.fork_length > 180 \
                 and random.random() < 0.002:  # this 0.002 weekly chance gives a 9 % annual chance of random dispersal
             self.set_activity(Activity.RANDOM_DISPERSAL)
             self.set_movement(Movement.RANDOM, 5)
@@ -273,36 +296,28 @@ class Fish(Agent):
 
         elif self.activity in (Activity.FRESHWATER_GROWTH, Activity.COMPETITIVE_DISPERSAL, Activity.RANDOM_DISPERSAL,
                                Activity.SUMMER_COLD_SEEKING, Activity.FALL_WARMTH_SEEKING) \
-                and ((self.is_small and self.network_reach.small_fish_count > self.network_reach.capacity_small_fish)
-                 or (self.is_medium and self.network_reach.medium_fish_count > self.network_reach.capacity_medium_fish)):
+                and self.is_being_outcompeted:
             # Each network reach has a fixed # of spots available (and unoccupied) at the start of each timestep,
             # as determined by its capacity. Because fish are stepped through in order from largest to smallest, the
             # large ones will fill the appropriate capacity first and the small ones have to move.
-            needs_to_move = False
-            if self.is_small:
-                self.network_reach.small_fish_spots_available -= 1
-                needs_to_move = self.network_reach.small_fish_spots_available < 0
-            elif self.is_medium:
-                self.network_reach.medium_fish_spots_available -= 1
-                needs_to_move = self.network_reach.medium_fish_spots_available < 0
-            if needs_to_move:
-                if self.activity is not Activity.COMPETITIVE_DISPERSAL:
-                    self.set_activity(Activity.COMPETITIVE_DISPERSAL)
-                if self.movement_mode is Movement.STATIONARY:
-                    self.set_movement(Movement.RANDOM, 1)
-            else:
-                if self.activity is Activity.COMPETITIVE_DISPERSAL:
-                    self.set_activity(Activity.FRESHWATER_GROWTH)
-                    self.set_movement(Movement.STATIONARY)
-                    self.set_home_reach(self.network_reach)
+            self.set_activity(Activity.COMPETITIVE_DISPERSAL)
+            if self.movement_mode is Movement.STATIONARY:
+                self.set_movement(Movement.RANDOM, 1)
+
+        # A competitive-dispersing fish that is no longer being outcompeted stops and switches to freshwater growth
+
+        elif self.activity is Activity.COMPETITIVE_DISPERSAL \
+                and not self.is_being_outcompeted:
+            self.set_activity(Activity.FRESHWATER_GROWTH)
+            self.set_movement(Movement.STATIONARY)
+            self.set_home_reach(self.network_reach)
 
         # Mature fish ready to spawn start seeking their natal reach
 
         elif self.is_mature \
                 and not self.has_spawned_this_year \
                 and self.activity not in (Activity.SPAWNING_MIGRATION, Activity.SPAWNING) \
-                and self.model.schedule.week_of_year_is_within(self.settings['SPAWNING_MIGRATION_START'],
-                        self.settings['SPAWNING_MIGRATION_END']) \
+                and self.model.schedule.week_of_year_is_within(self.settings['SPAWNING_MIGRATION_START'], self.settings['SPAWNING_MIGRATION_END']) \
                 and self.should_spawn_this_year:
             self.set_activity(Activity.SPAWNING_MIGRATION)
             self.set_movement(Movement.SEEKING_SPAWNING_REACH, self.settings['SPAWNING_MIGRATION_SPEED'])
@@ -352,7 +367,7 @@ class Fish(Agent):
             self.set_movement(Movement.STATIONARY)
 
         # Fish that reach the end of the spawning period without finding spawning grounds give up
-        # NEED TO RETHINK THIS PART A BIT!!!
+        # todo NEED TO RETHINK THIS PART A BIT!!!
 
         # elif self.activity in (Activity.SPAWNING_MIGRATION, Activity.SPAWNING) and not \
         #         self.model.schedule.week_of_year_is_within(self.settings['SPAWNING_MIGRATION_START'],
@@ -426,7 +441,7 @@ class Fish(Agent):
                 if self.current_route_position < len(self.current_route) - 1:
                     self.current_route_position += 1
             self.network_reach, self.position_within_reach = self.current_route[self.current_route_position]
-            if self.current_route_position == len(self.current_route) - 1:  # ADDED THE -1 HERE TO FIX THE PROBLEM
+            if self.current_route_position == len(self.current_route) - 1:
                 self.set_movement(Movement.STATIONARY)
                 self.current_route = None
         if self.network_reach != initial_network_reach:
@@ -434,43 +449,65 @@ class Fish(Agent):
             self.network_reach.fish.append(self)
             self.reach_history.append((self.event_log_index, self.age_weeks, self.network_reach.id))
 
+    def preferred_territory_size(self):
+        preferred_daily_ration = daily_grams_consumed_from_p(self.temperature, self.mass, self.preferred_p)
+        return preferred_daily_ration / self.network_reach.food_production
 
-    def grow(self, override_p=None):
+    def grow(self):
         if not self.network_reach.is_ocean:
-            p = self.p if override_p is None else override_p  # allows overriding normal p-value for special situations
-            dg = daily_growth_from_p(self.temperature, self.mass, p)
+            self.is_being_outcompeted = True
+            best_habitat_key = None
+            most_space_available = -1
+            space_preferred = self.preferred_territory_size()
+            for habitat_key, generic_nrei in self.current_habitat_preferences():
+                habitat_exists_in_reach = (habitat_key in self.network_reach.current_habitat_available.keys())
+                space_available = self.network_reach.current_habitat_available[habitat_key] if habitat_exists_in_reach else -2
+                if space_available >= space_preferred:
+                    self.is_being_outcompeted = False
+                    self.network_reach.current_habitat_available[habitat_key] -= space_preferred
+                    self.space_use_history.append((habitat_key, space_preferred))
+                    self.p = self.preferred_p
+                    break
+                else:
+                    if space_available > most_space_available:  # keep track of the habitat with the most space in case one with enough space is never found
+                        most_space_available = space_available
+                        best_habitat_key = habitat_key
+            if self.is_being_outcompeted:
+                proportion_of_preferred_territory_obtained = most_space_available / space_preferred
+                self.space_use_history.append((best_habitat_key, most_space_available))
+                self.network_reach.current_habitat_available[best_habitat_key] = 0
+                self.p = max(proportion_of_preferred_territory_obtained * self.preferred_p, self.settings['MINIMUM_FLOATER_P'])
+            dg = daily_growth_from_p(self.temperature, self.mass, self.p)
             weekly_growth_multiplier = (1 + dg) ** time_settings['DAYS_PER_WEEK']
             self.mass = self.mass * weekly_growth_multiplier
             if self.mass > self.lifetime_maximum_mass:
                 self.lifetime_maximum_mass = self.mass
                 self.fork_length = length_at_mass(self.mass)
-            if self.mass < self.settings['STARVATION_THRESHOLD'] * self.lifetime_maximum_mass:
-                self.die("Starvation")
+            self.p_history.append(self.p)
         else:
             self.fork_length = self.fork_length + 20.337 * self.ocean_age_weeks ** -0.476
             self.mass = mass_at_length(self.fork_length)
             self.lifetime_maximum_mass = self.mass
-        if self.is_small and self.fork_length >= 100:
-            self.is_small = False
-            self.is_medium = True
-        elif self.is_medium and self.fork_length > 180:
-            self.is_medium = False
+            self.p_history.append(np.nan)
 
     def possible_mortality(self):
         """ Currently this uses the same size-based model for anadromous spawners as other freshwater fish,
             and only uses a different model when they're out in the ocean. """
-        if not self.network_reach.is_ocean:
-            L = self.fork_length
-            if self.model.schedule.week_of_year_is_within(1, 19):  # winter -- WATCH THE INDEXING WITH 0/1 START
-                surv_prob = 0.00055*L + 0.921 if L <= 100 else 0.976
-            elif self.model.schedule.week_of_year_is_within(20, 32):  # summer
-                surv_prob = 0.00026 * L + 0.968 if L <= 100 else 0.994
-            else:  # weeks 33-46; fall
-                surv_prob = 0.00039 * L + 0.988 if L <= 100 else 0.988
+        if self.mass < self.settings['STARVATION_THRESHOLD'] * self.lifetime_maximum_mass:
+            self.die("Starvation")
         else:
-            surv_prob = 0.9952 # used for "anadromous adults" in HexSim, fish in ocean here
-        if random.random() > surv_prob:
-            self.die("Survival probability model")
+            if not self.network_reach.is_ocean:
+                L = self.fork_length
+                if self.model.schedule.week_of_year_is_within(1, 19):  # todo winter -- WATCH THE INDEXING WITH 0/1 START
+                    surv_prob = 0.00055*L + 0.921 if L <= 100 else 0.976
+                elif self.model.schedule.week_of_year_is_within(20, 32):  # summer
+                    surv_prob = 0.00026 * L + 0.968 if L <= 100 else 0.994
+                else:  # weeks 33-46; fall
+                    surv_prob = 0.00039 * L + 0.988 if L <= 100 else 0.988
+            else:
+                surv_prob = 0.9952  # used for "anadromous adults" in HexSim, fish in ocean here
+            if random.random() > surv_prob:
+                self.die("Survival probability model")
 
     def age_at_timestep(self, timestep):
         """ Gives the age in weeks of the fish at a given timestep of the overall model's schedule. If the fish
@@ -482,10 +519,20 @@ class Fish(Agent):
         else:
             return timestep - self.birth_week
 
+    def reach_at_timestep(self, target_timestep):
+        # Returns -3 (not a real reach) if the fish wasn't born yet
+        # Returns death reach if the fish was dead
+        result = -3
+        for eventid, life_week, reachid in self.reach_history:
+            timestep = life_week + self.birth_week
+            if timestep <= target_timestep:
+                result = reachid
+        return result
+
     def activity_at_age(self, age_weeks):
         previous_activity = self.activity_history[0][2]
-        for activity_timestep, activity in self.activity_history:
-            if activity_timestep >= age_weeks:
+        for event_log_index, activity_age, activity in self.activity_history:
+            if activity_age >= age_weeks:
                 return previous_activity
             previous_activity = activity
         return self.activity_history[-1][2]
@@ -495,6 +542,13 @@ class Fish(Agent):
 
     def mass_at_age(self, age):
         return self.mass_history[age]
+
+    def mass_at_timestep(self, timestep):
+        age = self.age_at_timestep(timestep)
+        if age > 0:
+            return self.mass_history[age]
+        else:
+            return None
 
     def activity_descriptors(self):
         activity_descriptors = [(x[0], x[1], "{0}.".format(x[2])) for x in self.activity_history]
@@ -587,8 +641,9 @@ class Fish(Agent):
         """ We don't delete the object here, because each deletion is an O(n) operation on the very large list of fish
             in the overall model and its network cell. It's a huge computational time-saver (more than half of model
             runtime) to flag fish for deletion and remove them the fish arrays together at the end of each timestep."""
-        self.is_dead = True
-        self.death_week = self.model.schedule.time
-        self.mortality_reason = reason
-        self.log_event("Died from {0}".format(reason))
-        self.model.schedule.dead_fish.append(self)
+        if not self.is_dead:    # Prevents fish from dying twice in rare cases where two mechanisms kill it before it's moved to recent_dead_fish
+            self.is_dead = True
+            self.death_week = self.model.schedule.time
+            self.mortality_reason = reason
+            self.log_event("Died from {0}".format(reason))
+            self.model.schedule.recent_dead_fish.append(self)

@@ -3,7 +3,8 @@ import os
 BASE_DIRECTORY = os.path.join(os.path.expanduser("~"), 'Dropbox', 'SFR')
 
 export_settings = dict(
-    RESULTS_PATH=os.path.join(BASE_DIRECTORY, 'Projects', 'SalmonidNetworkIBMResults')
+    RESULTS_PATH=os.path.join(BASE_DIRECTORY, 'Projects', 'SalmonidNetworkIBMResults'),
+    DEAD_FISH_CACHE_PATH=os.path.join(BASE_DIRECTORY, 'Projects', 'SalmonidNetworkIBMResults', 'DeadFishCache')
 )
 
 time_settings = dict(
@@ -18,7 +19,8 @@ network_settings = dict(
     OCEAN_REACH_LENGTH=250,          # km "length" of the ocean reach, used to spread out run timing a bit
     LEMHI_MOUTH=1627,
     PAHSIMEROI_MOUTH=2242,
-    YANKEE_FORK_MOUTH=3760,
+    YANKEE_FORK_MOUTH=3671,
+    PROPORTION_USABLE_HABITAT=1.0,  # Arbitrary multiplier to reduce habitat area beyond the raw predicitons to match generally reasonable numbers
     #SHAPEFILE=os.path.join(BASE_DIRECTORY, 'Projects', 'SalmonidNetworkIBM', 'Network', 'SalmonNetwork_R1_20171018.shp'),
     MICROHABITAT_MODEL_CACHE_PATH=os.path.join(BASE_DIRECTORY, 'Projects', 'SalmonidNetworkIBM', 'Network', 'Microhabitat_Model_Cache'),
     MICROHABITAT_PREFERENCE_CACHE_PATH=os.path.join(BASE_DIRECTORY, 'Projects', 'SalmonidNetworkIBM', 'resources', 'nrei_batch_results'),
@@ -49,8 +51,8 @@ resident_fish_settings = dict(
     FALL_WARMTH_SEEKING_START=35,  # week
     FALL_WARMTH_SEEKING_END=39,  # week
     FALL_WARMTH_SEEKING_RATE=5,  # km/week
-    STARVATION_THRESHOLD=0.8,  # a fish dies when it drops below this proportion of its lifetime maximum mass
-    DISPLACED_FISH_RATION_FACTOR=0.2  # multiplier by which a fish's ration is reduced when looking for a spot
+    STARVATION_THRESHOLD=0.8,    # a fish dies when it drops below this proportion of its lifetime maximum mass
+    MINIMUM_FLOATER_P=0.25       # lowest possible proportion of maximum ration for outcompeted fish as floaters
 )
 
 anadromous_fish_settings = resident_fish_settings.copy()  # define as equal, specify differences below

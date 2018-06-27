@@ -72,27 +72,6 @@ class StreamNetwork:
                 exit("Network loading error: Reach {0} has no downstream reach.".format(reach.id))
             elif len(downstream_reaches) > 1:
                 exit("Network loading error: Reach {0} has {1} downstream reaches.".format(reach.id, len(downstream_reaches)))
-        # Load temperature data for the network reaches
-        print("Loading temperature data for the network.")
-
-        # reach_temperatures = {}
-        # with open(network_settings['TEMPERATURE_FILE'], newline='') as temperature_file:
-        #     reader = csv.DictReader(temperature_file)
-        #     for row in reader:
-        #         temperature_strings = list(row.values())[1:]
-        #         reach_temperatures[int(row['LineOID'])] = [float(temperature) for temperature in temperature_strings]
-        # for reach in self.reaches:
-        #     reach.set_temperatures(reach_temperatures[reach.id])
-
-        tf = shapefile.Reader(network_settings['TEMPERATURE_FILE'])
-        tfields = [field[0] for field in tf.fields if 'TMn' in field[0]]
-        attrib_keys = [field[0] for field in tf.fields][1:]
-        for attrib_values in tf.iterRecords():
-            attribs = dict(zip(attrib_keys, attrib_values))
-            reach = self.reach_with_id(int(attribs['LineOID']), True)
-            if reach is not None:
-                reach.set_temperatures([attribs[field] for field in tfields])
-
         # Create two "special" network reaches, which copy their properties (except length) from the lower reach
         # The "migration reach" represents the ~1100 km from the lower part of our network to the ocean
         self.migration_reach = NetworkReach(self, most_downstream_reach_attribs, points, None, None)
@@ -116,6 +95,27 @@ class StreamNetwork:
         self.ocean_reach.points = [(-1415000, 759943), (-1400000, 759943)]
         self.ocean_reach.calculate_midpoint()
         self.reaches.append(self.ocean_reach)
+        # Create a dictionary of reach IDs for faster lookups
+        self.reach_id_dict = {reach.id: reach for reach in self.reaches}
+        # Load temperature data for the network reaches
+        print("Loading temperature data for the network.")
+        # reach_temperatures = {}
+        # with open(network_settings['TEMPERATURE_FILE'], newline='') as temperature_file:
+        #     reader = csv.DictReader(temperature_file)
+        #     for row in reader:
+        #         temperature_strings = list(row.values())[1:]
+        #         reach_temperatures[int(row['LineOID'])] = [float(temperature) for temperature in temperature_strings]
+        # for reach in self.reaches:
+        #     reach.set_temperatures(reach_temperatures[reach.id])
+
+        tf = shapefile.Reader(network_settings['TEMPERATURE_FILE'])
+        tfields = [field[0] for field in tf.fields if 'TMn' in field[0]]
+        attrib_keys = [field[0] for field in tf.fields][1:]
+        for attrib_values in tf.iterRecords():
+            attribs = dict(zip(attrib_keys, attrib_values))
+            reach = self.reach_with_id(int(attribs['LineOID']), True)
+            if reach is not None:
+                reach.set_temperatures([attribs[field] for field in tfields])
         # Calculate predicted mean annual GPP (as actual value and percentile) for each reach
         print("Calculating GPP percentiles.")
         for reach in self.reaches:
@@ -150,15 +150,20 @@ class StreamNetwork:
                 and (reach.is_within_steelhead_extent or not restricted_to_steelhead_extent):
             return reach
         else:
-            return self.random_reach()
+            return self.random_reach(restricted_to_steelhead_extent)
 
     def reach_with_id(self, id, suppress_not_found_warning=False):
-        reaches = [reach for reach in self.reaches if reach.id == id]
-        if len(reaches) == 0:
-            if not suppress_not_found_warning:
-                print("No reach with ID ", id)
+        # todo replace this with a dictionary or even array lookup (indexed by ID) for speed
+        # reaches = [reach for reach in self.reaches if reach.id == id]
+        # if len(reaches) == 0:
+        #     if not suppress_not_found_warning:
+        #         print("No reach with ID ", id)
+        # else:
+        #     return reaches[0]
+        if id not in self.reach_id_dict.keys():
+            return None
         else:
-            return reaches[0]
+            return self.reach_id_dict[id]
 
     def load_depth_velocity_regressions(self):
         # Somewhere this function generates annoying "Optimization terminated successfully." printouts and I'm not sure where.
@@ -193,7 +198,7 @@ class StreamNetwork:
                 for depth in df.loc[velocity].index:
                     nrei = df.loc[velocity].loc[str(depth)]
                     if nrei > 0:
-                        label = "{0}_{1:.1f}".format(depth, velocity)
+                        label = "{0:.1f}_{1:.1f}".format(0.01 * float(depth), 0.01 * float(velocity)) # converting from cm from BioenergeticHSC back to m for this model
                         habitat_prefs.append((label, nrei))
             return sorted(habitat_prefs, key=lambda x: -x[1])
         print("Loading a library of habitat preferences from NREI modeling results.")

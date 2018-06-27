@@ -43,19 +43,13 @@ class NetworkReach:
         self.fish = []
         self.redds = []
         self.temperatures = []
-        self.small_fish_count = 0
-        self.medium_fish_count = 0
-        self.capacity_small_fish = math.ceil(0.02 * self.area / self.strahler_order**2 + 0.5)
-        self.capacity_medium_fish = math.ceil(0.01 * self.area / self.strahler_order**2 + 0.5)
-        self.small_fish_spots_available = self.capacity_small_fish
-        self.medium_fish_spots_available = self.capacity_medium_fish
         self.history = []
         self.calculate_midpoint()
         self.mean_gpp = None                # placeholder, calculated by network after building all reaches
         self.mean_gpp_percentile = None     # same
         self.food_production = None         # same. units are g dry mass produced per m2 per day
         self.initial_habitat_available = self.predict_habitat_areas(**kwargs)
-        self.current_food_availability = copy.deepcopy(self.initial_habitat_available)
+        self.current_habitat_available = copy.copy(self.initial_habitat_available)
 
     def set_temperatures(self, temperatures):
         self.temperatures = temperatures
@@ -113,17 +107,18 @@ class NetworkReach:
         return dict(list(vals))
 
     def predict_habitat_areas(self, **kwargs):
+        force_recalculate_microhabitat = kwargs.get('force_recalculate_microhabitat', False)
         cache_file_path = os.path.join(network_settings['MICROHABITAT_MODEL_CACHE_PATH'], "reach_{0}.pickle".format(self.id))
         directory = os.path.dirname(cache_file_path)
         if not os.path.exists(directory):
             os.makedirs(directory)
-        if os.path.isfile(cache_file_path) and not kwargs.get('force_recalculate_microhabitat', False):
+        if os.path.isfile(cache_file_path) and not force_recalculate_microhabitat:
             with open(cache_file_path, 'rb') as file:
                 habitat_areas = pickle.load(file)
         else:
             print("Predicting microhabitat proportions available for reach {0}".format(self.id))
             proportions_dict = self.predict_normalized_habitat_proportions(self.gradient, self.bank_full_width)
-            habitat_areas = {key: value * self.wetted_area for key, value in proportions_dict.items()}
+            habitat_areas = {key: value * self.wetted_area * network_settings['PROPORTION_USABLE_HABITAT'] for key, value in proportions_dict.items()}
             with open(cache_file_path, 'wb') as file:
                 pickle.dump(habitat_areas, file)
         return habitat_areas
@@ -139,11 +134,7 @@ class NetworkReach:
 
     def step(self, timestep):
         # could also speed things up by flagging whether any fish died and not doing the 2 lines below if nothing died
-        self.current_food_availabile = copy.deepcopy(self.initial_habitat_available)
-        self.small_fish_spots_available = self.capacity_small_fish
-        self.medium_fish_spots_available = self.capacity_medium_fish
-        self.small_fish_count = len([fish for fish in self.fish if fish.is_small])
-        self.medium_fish_count = len([fish for fish in self.fish if fish.is_medium])
+        self.current_habitat_available = copy.copy(self.initial_habitat_available)
         self.redds = [redd for redd in self.redds if not redd.is_dead]
         self.fish = [fish for fish in self.fish if not fish.is_dead]
         self.history.append({'step': timestep,
@@ -151,9 +142,7 @@ class NetworkReach:
                                                 if fish.life_history == LifeHistory.ANADROMOUS]),
                              'resident': len([fish for fish in self.fish
                                               if fish.life_history == LifeHistory.RESIDENT]),
-                             'n_redds': len(self.redds),
-                             'small': self.small_fish_count,
-                             'medium': self.medium_fish_count
+                             'n_redds': len(self.redds)
                              })
 
     def reach_statistic(self, value, timestep=None):
@@ -174,10 +163,6 @@ class NetworkReach:
                 return step_history['anadromous'] + step_history['resident']
             elif value == 'proportion_capacity_redds':
                 return step_history['n_redds'] / self.capacity_redds
-            elif value == 'proportion_capacity_small':
-                return step_history['small'] / self.capacity_small_fish
-            elif value == 'proportion_capacity_medium':
-                return step_history['small'] / self.capacity_medium_fish
             else:
                 sys.exit("Invalid reach history value requested.")
         else:
@@ -211,7 +196,7 @@ class NetworkReach:
             if progress % int(len(fish_with_activity)/20) == 1:
                 print("Doing passage record for {0} fish. Progress: {1:.0f} %.".format(len(fish_with_activity), 100 * progress / len(fish_with_activity)))
             previous_reach_id = -1
-            for age, reach_id in fish.reach_history:
+            for event_index, age, reach_id in fish.reach_history:
                 timestep = fish.birth_week + age
                 if previous_reach_id > -1:
                     previous_reach = self.network.reach_with_id(previous_reach_id)

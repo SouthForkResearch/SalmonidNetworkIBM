@@ -6,116 +6,18 @@ from moviepy.editor import *
 from bokeh.io import export_png
 from bokeh.io.output import reset_output
 from bokeh.plotting import figure, show
-from bokeh.models import HoverTool, Label, ColumnDataSource, Arrow, VeeHead, TableColumn, DataTable, LinearAxis, Range1d
-
+from bokeh.models import HoverTool, Label, ColumnDataSource, Arrow, VeeHead, TableColumn, DataTable, \
+    NumberFormatter, LinearAxis, Range1d, Span, Axis, Div
 
 from SalNetIBM.fish import LifeHistory, Activity, Sex, Movement
 from SalNetIBM.fish_model import FishModel
-from SalNetIBM.settings import export_settings
-
+from SalNetIBM.settings import export_settings, time_settings
 
 def clean_show(item):
     reset_output()
     show(item)
 
-test_model = FishModel(2000)
-
-
-
-# all_gpps ranges from 0.0008 to 0.74 (for annual mean)
-
-# site with lineOID 3799 has conductivity of 113102 (next highest is 345), so i'm capping at 350 in the gpp equation
-
-
-from SalNetIBM.bioenergetics import daily_growth_from_grams_consumed, daily_growth_from_p
-import numpy as np
-import scipy
-
-
-def elliott_territory_size_m2(fork_length_mm):
-    if fork_length_mm < 40:
-        territory_size_cm2 = 10 ** (-2.844 + 3.453 * np.log10(fork_length_mm))
-    else:
-        territory_size_cm2 = 10 ** (-0.901 + 2.24 * np.log10(fork_length_mm))
-    return territory_size_cm2 / 10000
-
-
-def food_per_m2_for_target_growth_rate(fish, specific_growth_rate_g_per_g):
-    # Want find food_per_m2 to minimize this objective function, achieving the desired growth rate
-    def objective_function(food_g_per_day_per_m2):
-        consumption_g_per_day = float(elliott_territory_size_m2(fish.fork_length) * food_g_per_day_per_m2)
-        return abs(daily_growth_from_grams_consumed(15, fish.mass, consumption_g_per_day) - specific_growth_rate_g_per_g)
-    result = scipy.optimize.minimize(objective_function, [1], method='SLSQP', bounds=[(1e-12, 1e5)])
-    if result.success == True:
-        return result.x[0]
-    else:
-        print("WARNING: Optimization of food quantity to target consumption rate didn't work. Result: ", result)
-        return -1
-
-fish = test_model.random_live_fish()
-target_rate = 0.01
-food_concentration = food_per_m2_for_target_growth_rate(fish, target_rate)
-dg = daily_growth_from_grams_consumed(15, fish.mass, elliott_territory_size_m2(fish.fork_length)*food_concentration)
-print("Got actual growth {0:.2f} for target growth {1:.2f}, with food concentration {2} g/m2/day.".format(dg, target_rate, food_concentration))
-
-
-# Look at the food concentration to achieve a fairly good p-value from a standard-sized territory as the fish increases in size.
-fish = test_model.random_live_fish()
-fish.model.schedule.time = 24  # set to a summer temperature for +growth
-fish.p = 0.4  # give it a good ration
-masses = []
-food_concs = []
-for i in range(200):
-    masses.append(fish.mass)
-    well_fed_fish_daily_specific_growth = daily_growth_from_p(fish.temperature, fish.mass, fish.p)
-    food_concs.append(food_per_m2_for_target_growth_rate(fish, well_fed_fish_daily_specific_growth))
-    fish.grow()
-source = ColumnDataSource({'mass': masses, 'food_concs': food_concs})
-fig = figure(tools=[], plot_width=450, plot_height=320)
-fig.xaxis.axis_label = 'Mass of fish (g)'
-fig.yaxis.axis_label = 'Food concentration to get p={0:2f} from avg territory'.format(fish.p)
-fig.line('mass', 'food_concs', source=source, line_width=2, legend='Mass', line_color='forestgreen')
-fig.toolbar.logo = None
-clean_show(fig)
-
-# This approaches an asymptote right around 2 g/m2/day for p=0.4.
-# For p=0.2, the asymptote is down around 1.5 g/m2/day.
-# For p=0.5, it's around 2.3 g/m2/day.
-# We want the median GPP (percentile 0.5) to line up pretty well with about 2 g/m2/day.
-# To create decent contrast in the extremes without territory sizes getting unrealistically out of hand,
-# we can allow it to range from around 1.5 to 2.5 g/m2/day.
-# Therefore food_production_g_per_m2_per_day = 1.5 + mean_gpp_percentile
-
-
-# Food concentration to achieve a given specific growth rate in a standard territory increases with mass, not surprisingly,
-# because big fish should generally have lower specific growth rates. To find a good "average" food concentration to match
-# with average GPP, we need to also know "average" specific growth rates for fish at different sizes.
-
-
-
-
-
-
-
-
-
-
-
-
-#
-
-for i in range(2):
-    test_reach = test_model.network.random_reach(True)
-    gpp_plot = test_reach.gpp_plot()
-    clean_show(gpp_plot)
-
-# in this one, ascent_path includes 1483, but the final route doesn't get it
-# problem_route = test_model.network.route(test_model.network.ocean_reach, test_model.network.reach_with_id(1483), -23, 50)
-# [(item[0].id, item[1]) for item in problem_route]  # needs to end on 1483
-
-# problem_route = test_model.network.route(test_model.network.reach_with_id(1612), test_model.network.reach_with_id(1613), 0.701, 5)
-# [(item[0].id, item[1]) for item in problem_route]  # needs to end on 1613
-
+test_model = FishModel(100000)
 
 # fig = figure(plot_width=1024, plot_height=768, toolbar_location='above')
 # test_model.network.plot(fig)
@@ -129,25 +31,104 @@ def run_model(n_steps):
                                                                   test_model.schedule.fish_count,
                                                                   test_model.schedule.redd_count))
 
-run_model(100)
+run_model(700)
 
+
+import cProfile
+cProfile.run('run_model(5)', 'runstats')
+
+import pstats
+p = pstats.Stats('runstats')
+p.sort_stats('cumtime').print_stats(20)
+
+# So the bad ones were already disconnected for pickling, and somehow were still included....
 
 test_model.generate_report(movies=False, passage=False, individuals=30)
+test_model.create_movie(test_model.mainpanel_videoframe_function, 'Total Population Details', 'population')
 
-# ran into error:
-#   File "/Users/Jason/Dropbox/SFR/Projects/SalmonidNetworkIBM/SalNetIBM/fish_model.py", line 223, in success_rate_table
-#     rates['Smolt-to-ocean survival'] = len(fish_that_grew_in_salt) / len(fish_that_smolted)
-# ZeroDivisionError: division by zero
+# Find individuals in reach 2817 on timestep 433
 
-show(test_model.fish_with_id(9879).plot())
+live_fish_at_time = test_model.fish_alive_at_timestep(433)
+test_fish = [fish for fish in live_fish_at_time if fish.reach_at_timestep(432) == 2817] # seems to really show what's going on at 433
+for fish in test_fish:
+    if fish.mass_at_timestep(432) > 1:
+        print(fish.mass_at_timestep(432))
+# I've got some things to sort with the indexing to be able to get a list of fish IDs in a given reach at a given time, some indices off by 1 somewhere
+# Also check that dispersal fish are doing some freshwater growth
+# Add territory size to log
 
 
 
-test_model.generate_report()
-test_model.create_movie(test_model.population_videoframe_function, 'Total Population', 'population')
-test_model.create_movie(test_model.population_videoframe_function, 'Redd Count', 'redds')
-test_model.create_movie(test_model.capacity_videoframe_function, 'Redd Capacity', 'proportion_capacity_redds')
+for i in range(20):
+    clean_show(test_fish[i].plot())
+
+# Todo new plots:
+
+# - Spawner size distributions, by year and life history
+
+# Plot number of anadromous spawners per year, although Redd plot is kind of similar to that
+
+# - Plot the spawner-recruit relationship? Although it would have very poor contrast without some more stochasticity.
+
+# - Mean lifespan of now-dead fish as a function of birth timestep and life history
+
+# - Plot the population of a given reach over time, by life history and size
+
+# - Need to figure out if they were mature at the beginning of the spawning period
+# - Then figure out if their event history include successful or unsuccesful spawning
+# - If neither, they didn't spawn: but figure out if they tried to do the migration
+
+import numpy as np
+import pandas as pd
+from bokeh.layouts import column, row
+from SalNetIBM.settings import resident_fish_settings, anadromous_fish_settings
+from bokeh.palettes import viridis
+
+len(test_model.schedule.recent_dead_fish)
+
+import pickle
+
+bad_fish = None
+with open("/Users/Jason/Desktop/temp.pickle", mode='wb') as log_file:
+    p = pickle.Pickler(log_file)
+    p.dump(test_model.schedule.recent_dead_fish[41535])
+    # for fish in test_model.schedule.recent_dead_fish:
+    #     # try to pickle fish one-by-one
+    #     bad_fish = fish
+    #     p.dump(fish)
+    #     break
+
+temp_fish = test_model.schedule.recent_dead_fish[41535]
+
+# -- Investigate Yankee Fork zero smolt passage??
+
+
+
+
+fig = test_model.plot_freshwater_growth_rates()
+clean_show(fig)
+export_png(fig, os.path.join(export_settings['RESULTS_PATH'], "Freshwater Growth Rates.png"))
+
+
+
+
+# EXAMPLE OF HOW TO MODIFY A FUNCTION FOR A LIVE OBJECT
+
+# from SalNetIBM.fish import Fish
+# def activity_at_age(self, age_weeks):
+#     previous_activity = self.activity_history[0][2]
+#     for event_log_index, activity_age, activity in self.activity_history:
+#         if activity_age >= age_weeks:
+#             return previous_activity
+#         previous_activity = activity
+#     return self.activity_history[-1][2]
+# Fish.activity_at_age = activity_at_age
+
+test_model.create_movie(test_model.mainpanel_videoframe_function, 'Total Population Details', 'population')
 export_png(test_model.passage_report(), os.path.join(export_settings['RESULTS_PATH'], "Passage Plots.png"))
+
+# RUN TIMING TEST
+
 
 # cProfile.run('run_model(500)', 'runstats')
 # p = pstats.Stats('runstats')
@@ -195,10 +176,9 @@ anad_stuck_migration = [fish for fish in fish_stuck_migration if fish.life_histo
 
 show(fish_stuck_spawning[0].plot())
 
-
-
-
-
+# todo check territory sizes
+# todo check amount of time fish are taking to die and whether they eat at all during dispersion
+# todo see if large fish are using very large territories inefficiently and occupying space to block out small fish
 
 # Network property plots -- put basic capacity plots
 
@@ -208,16 +188,13 @@ fig.ygrid.visible = False
 fig.xaxis.visible = False
 fig.yaxis.visible = False
 # test_model.network.plot(fig)
-test_model.network.plot(fig, color_attr='mean_gpp_percentile')
+# test_model.network.plot(fig, history_step=433, color_attr='temperature', circle_attr='population', circle_hover_attrs=['id','population','anadromous','resident'])
 # test_model.network.plot(fig, color_attr='capacity_redds')
 # test_model.network.plot(fig, color_attr='capacity_small_fish')
 # test_model.network.plot(fig, history_step=25, color_attr='proportion_capacity_small', color_attr_bounds=[0, 1])
-# test_model.network.plot(fig, history_step=99, color_attr='temperature', circle_attr='population',
-#                         circle_attr_transform=lambda x: 1.0 * math.sqrt(x), circle_line_color='#cb7723',
-#                         circle_fill_color='#fcb001')#,
-                        # circle_hover_attrs=['id', 'length', 'population', 'anadromous', 'resident',
-                        #                     'capacity_small_fish', 'small', 'proportion_capacity_small',
-                        #                     'capacity_medium_fish', 'medium', 'proportion_capacity_medium',
-                        #                     'capacity_redds', 'redds', 'proportion_capacity_redds'])
+test_model.network.plot(fig, history_step=433, color_attr='temperature', circle_attr='population',
+                        circle_attr_transform=lambda x: 1.0 * math.sqrt(x), circle_line_color='#cb7723',
+                        circle_fill_color='#fcb001',
+                        circle_hover_attrs=['id', 'population', 'anadromous', 'resident'])
 clean_show(fig)
 
