@@ -43,6 +43,7 @@ class NetworkReach:
         self.fish = []
         self.redds = []
         self.temperatures = []
+        self.current_temperature = 0
         self.history = []
         self.calculate_midpoint()
         self.mean_gpp = None                # placeholder, calculated by network after building all reaches
@@ -53,8 +54,9 @@ class NetworkReach:
 
     def set_temperatures(self, temperatures):
         self.temperatures = temperatures
+        self.current_temperature = self.temperatures[0]
 
-    def set_mean_gpp(self): # has to be run after set_temperatures
+    def set_mean_gpp(self):  # has to be run after set_temperatures
         self.mean_gpp = np.array([self.gpp_at_week(week) for week in list(np.arange(1, 49))]).mean()
 
     def temperature_at_week(self, week_of_simulation):
@@ -63,6 +65,7 @@ class NetworkReach:
             cycle or something with temperatures rising or falling from year to year, and it should still
             work fine. Another alternative would be to build into this a 'year' check and hard-code or build
             some system to modify temperatures in certain years."""
+        # todo this is called so much it eats some time, mostly for current temperature; save that once in step() instead
         if self.is_ocean or self.is_migration_reach:
             return self.network.most_downstream_reach.temperature_at_week(week_of_simulation)
         else:
@@ -134,14 +137,15 @@ class NetworkReach:
 
     def step(self, timestep):
         # could also speed things up by flagging whether any fish died and not doing the 2 lines below if nothing died
+        self.current_temperature = self.temperature_at_week(timestep)
         self.current_habitat_available = copy.copy(self.initial_habitat_available)
         self.redds = [redd for redd in self.redds if not redd.is_dead]
         self.fish = [fish for fish in self.fish if not fish.is_dead]
+        anadromous_fish_count = len([fish for fish in self.fish if fish.life_history == LifeHistory.ANADROMOUS])
+        resident_fish_count = len(self.fish) - anadromous_fish_count
         self.history.append({'step': timestep,
-                             'anadromous': len([fish for fish in self.fish
-                                                if fish.life_history == LifeHistory.ANADROMOUS]),
-                             'resident': len([fish for fish in self.fish
-                                              if fish.life_history == LifeHistory.RESIDENT]),
+                             'anadromous': anadromous_fish_count,
+                             'resident': resident_fish_count,
                              'n_redds': len(self.redds)
                              })
 

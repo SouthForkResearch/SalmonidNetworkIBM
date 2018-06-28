@@ -83,3 +83,8 @@ def mass_at_length(fork_length):
 @jit(nopython=True)
 def length_at_mass(mass):
     return 10 ** ((np.log10(mass) + 4.7) / 2.9)
+
+@jit(nopython=True)
+def preferred_territory_size(T, W, p, network_reach_food_production):
+    preferred_daily_ration = daily_grams_consumed_from_p(T, W, p)
+    return preferred_daily_ration / network_reach_food_production

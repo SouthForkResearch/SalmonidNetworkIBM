@@ -1,12 +1,11 @@
 from mesa import Agent
 import random
-from bokeh.models import HoverTool, Label, ColumnDataSource, Arrow, VeeHead, TableColumn, DataTable, LinearAxis, Range1d
-from bokeh.layouts import column, row
-from bokeh.plotting import figure
 import numpy as np
 
+from ._FishPlotting import FishPlotting
+
 from .settings import time_settings, resident_fish_settings, anadromous_fish_settings, spawning_settings
-from .bioenergetics import daily_growth_from_p, mass_at_length, length_at_mass, daily_grams_consumed_from_p
+from .bioenergetics import daily_growth_from_p, mass_at_length, length_at_mass, preferred_territory_size
 
 from enum import Enum, auto
 
@@ -49,7 +48,7 @@ class SpawnStatus(Enum):
     AWAITING_MATE = auto()
 
 
-class Fish(Agent):
+class Fish(Agent, FishPlotting):
     """ A single O. mykiss individual."""
     def __init__(self, unique_id, model, network_reach, life_history, redd):
         super().__init__(unique_id, model)
@@ -139,7 +138,7 @@ class Fish(Agent):
 
     @property
     def temperature(self):
-        return self.network_reach.temperature_at_week(self.model.schedule.time)
+        return self.network_reach.current_temperature
 
     @property
     def is_mature(self):
@@ -178,13 +177,14 @@ class Fish(Agent):
         return self.age_weeks / time_settings['WEEKS_PER_YEAR']
 
     def current_habitat_preferences(self):
-        temperature_key = int(round(self.temperature))
+        temperature_key = int(round(self.network_reach.current_temperature))
         if temperature_key < 1:
             temperature_key = 1
         if temperature_key > 20:
             temperature_key = 20
-        lengths_for_temperature = np.array(list(self.network_reach.network.habitat_preferences[temperature_key].keys()))
-        length_key = lengths_for_temperature[(np.abs(lengths_for_temperature - self.fork_length)).argmin()]
+        #lengths_for_temperature = np.array(list(self.network_reach.network.habitat_preferences[temperature_key].keys()))
+        #length_key = lengths_for_temperature[(np.abs(lengths_for_temperature - self.fork_length)).argmin()]
+        length_key = self.network_reach.network.habitat_preference_fork_lengths[np.abs(self.network_reach.network.habitat_preference_fork_lengths - self.fork_length).argmin()]
         return self.network_reach.network.habitat_preferences[temperature_key][length_key]
 
     def step(self):
@@ -207,7 +207,7 @@ class Fish(Agent):
         # Record history, except p_history, which is recorded in grow()
         self.length_history.append(self.fork_length)
         self.mass_history.append(self.mass)
-        self.temperature_history.append(self.temperature)
+        self.temperature_history.append(self.network_reach.current_temperature)
 
         self.dispatch_activities()
 
@@ -246,7 +246,7 @@ class Fish(Agent):
         # Fish in hot water during the summer seek cold water and stop when they get there
 
         elif self.activity is Activity.FRESHWATER_GROWTH \
-                and self.temperature > 24 \
+                and self.network_reach.current_temperature > 24 \
                 and self.model.schedule.week_of_year_is_within(self.settings['SUMMER_COLD_SEEKING_START'],
                     self.settings['SUMMER_COLD_SEEKING_END']):
             self.set_activity(Activity.SUMMER_COLD_SEEKING)
@@ -254,7 +254,7 @@ class Fish(Agent):
             self.set_movement(Movement.UPSTREAM, cold_seeking_rate)
 
         elif self.activity is Activity.SUMMER_COLD_SEEKING \
-                and self.temperature <= 20:
+                and self.network_reach.current_temperature <= 20:
             self.set_activity(Activity.FRESHWATER_GROWTH)
             self.set_movement(Movement.STATIONARY)
 
@@ -449,16 +449,12 @@ class Fish(Agent):
             self.network_reach.fish.append(self)
             self.reach_history.append((self.event_log_index, self.age_weeks, self.network_reach.id))
 
-    def preferred_territory_size(self):
-        preferred_daily_ration = daily_grams_consumed_from_p(self.temperature, self.mass, self.preferred_p)
-        return preferred_daily_ration / self.network_reach.food_production
-
     def grow(self):
         if not self.network_reach.is_ocean:
             self.is_being_outcompeted = True
             best_habitat_key = None
             most_space_available = -1
-            space_preferred = self.preferred_territory_size()
+            space_preferred = preferred_territory_size(self.network_reach.current_temperature, self.mass, self.p, self.network_reach.food_production)
             for habitat_key, generic_nrei in self.current_habitat_preferences():
                 habitat_exists_in_reach = (habitat_key in self.network_reach.current_habitat_available.keys())
                 space_available = self.network_reach.current_habitat_available[habitat_key] if habitat_exists_in_reach else -2
@@ -477,7 +473,7 @@ class Fish(Agent):
                 self.space_use_history.append((best_habitat_key, most_space_available))
                 self.network_reach.current_habitat_available[best_habitat_key] = 0
                 self.p = max(proportion_of_preferred_territory_obtained * self.preferred_p, self.settings['MINIMUM_FLOATER_P'])
-            dg = daily_growth_from_p(self.temperature, self.mass, self.p)
+            dg = daily_growth_from_p(self.network_reach.current_temperature, self.mass, self.p)
             weekly_growth_multiplier = (1 + dg) ** time_settings['DAYS_PER_WEEK']
             self.mass = self.mass * weekly_growth_multiplier
             if self.mass > self.lifetime_maximum_mass:
@@ -549,93 +545,6 @@ class Fish(Agent):
             return self.mass_history[age]
         else:
             return None
-
-    def activity_descriptors(self):
-        activity_descriptors = [(x[0], x[1], "{0}.".format(x[2])) for x in self.activity_history]
-        reach_descriptors = [(x[0], x[1], "Reach {0}.".format(x[2])) for x in self.reach_history]
-        movement_descriptors = [(x[0], x[1], "{0} at rate {1}.".format(x[2], x[3])) for x in
-                                self.movement_history]
-        event_descriptors = [(x[0], x[1], "{0}.".format(x[2])) for x in self.event_history]
-        descriptors = sorted(activity_descriptors + movement_descriptors + reach_descriptors + event_descriptors,
-                             key=lambda x: x[0])
-        if self.is_dead:
-            title = "{7} {0} {1} id {8} lived to age {2:.2f} ({3} weeks) and died at length {4:.0f} mm ({5:.1f} g) from '{6}'".format(
-                self.life_history.name, self.sex.name, self.age_years, self.age_weeks, self.fork_length, self.mass,
-                self.mortality_reason, self.origin.name, self.unique_id)
-        else:
-            title = "{6} {0} {1} id {7} is still alive at age {2:.2f} ({3} weeks) with current length {4:.0f} mm ({5:.1f} g).".format(
-                self.life_history.name, self.sex.name, self.age_years, self.age_weeks, self.fork_length, self.mass,
-                self.origin.name, self.unique_id)
-        lifetext = ""
-        for descriptor in descriptors:
-            lifetext += descriptor[2] + "\n"
-        source = ColumnDataSource({'age_weeks': [d[1] for d in descriptors],
-                                   'age_years': [d[1] / time_settings['WEEKS_PER_YEAR'] for d in descriptors],
-                                   'life_event': [d[2] for d in descriptors]
-                                   })
-        return title, lifetext, source
-
-    def plot(self):
-        lifemap = figure(plot_width=750, plot_height=570, toolbar_location='below')
-        lifemap.xgrid.visible = False
-        lifemap.ygrid.visible = False
-        lifemap.xaxis.visible = False
-        lifemap.yaxis.visible = False
-        self.network_reach.network.plot(lifemap)
-        reachids = list(np.array(self.reach_history).T[2])
-        pointx, pointy = list(np.array([self.network_reach.network.reach_with_id(id).midpoint for id in reachids]).T)
-        source = ColumnDataSource({'xs': pointx,
-                                   'ys': pointy,
-                                   'reach_id': reachids})
-        lifemap.scatter('xs', 'ys', source=source, name='scatterplot', marker='circle', size=10,
-                        line_color='#cb7723', fill_color='#fcb001', alpha=1.0)
-        hover_tooltips = [('reach', '@reach_id')]
-        lifemap.add_tools(HoverTool(tooltips=hover_tooltips, names=['scatterplot']))
-        lifemap.add_layout(Label(x=30, y=700, x_units='screen', y_units='screen', text="Fish ID {0}".format(self.unique_id)))
-        title, lifetext, lifesource = self.activity_descriptors()
-        lifemap.title.text = title
-        lifemap.title.text_font_size = "10px"
-        lifemap.toolbar.logo = None
-        for i in range(1, len(pointx)):
-            lifemap.add_layout(Arrow(end=VeeHead(size=10, line_color='#cb7723', fill_color='#fcb001'), line_color='#fcb001',
-                                     x_start=pointx[i - 1], y_start=pointy[i - 1], x_end=pointx[i], y_end=pointy[i]))
-        columns = [
-                TableColumn(field="age_weeks", title="Week", width=40),
-                TableColumn(field="age_years", title="Age", width=45),
-                TableColumn(field="life_event", title="Life Event", width=315)
-            ]
-        data_table = DataTable(source=lifesource, columns=columns, row_headers=False, width=400, height=600)
-        lyt = row(
-                [data_table,
-                lifemap,
-                column([self.plot_growth(), self.plot_temperature()])],
-            sizing_mode='fixed')
-        return lyt
-
-    def plot_growth(self):
-        source = ColumnDataSource({'age': list(np.arange(len(self.mass_history)) / time_settings['WEEKS_PER_YEAR']),
-                                   'mass': self.mass_history,
-                                   'length': self.length_history})
-        fig = figure(tools=[], plot_width=350, plot_height=280)
-        fig.extra_y_ranges = {'length_range': Range1d(start=min(self.length_history)-3, end=max(self.length_history)+3)}
-        fig.xaxis.axis_label = 'Age (years)'
-        fig.yaxis.axis_label = 'Mass (g)'
-        fig.add_layout(LinearAxis(y_range_name='length_range', axis_label='Fork length (mm)'), 'right')
-        fig.line('age', 'mass', source=source, line_width=2, legend='Mass', line_color='forestgreen')
-        fig.line('age', 'length', source=source, y_range_name='length_range', line_width=2, legend='Length', line_color='slateblue', line_dash='dotted')
-        fig.legend.location = 'top_left'
-        fig.toolbar.logo = None
-        return fig
-
-    def plot_temperature(self):
-        source = ColumnDataSource({'age': list(np.arange(len(self.mass_history)) / time_settings['WEEKS_PER_YEAR']),
-                                   'temperature': self.temperature_history})
-        fig = figure(tools=[], plot_width=350, plot_height=280)
-        fig.line('age', 'temperature', source=source, line_width=2, line_color='firebrick')
-        fig.xaxis.axis_label = 'Age (years)'
-        fig.yaxis.axis_label = 'Temperature (C)'
-        fig.toolbar.logo = None
-        return fig
 
     def die(self, reason):
         """ We don't delete the object here, because each deletion is an O(n) operation on the very large list of fish

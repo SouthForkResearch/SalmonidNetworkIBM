@@ -13,6 +13,7 @@ from SalNetIBM.fish import LifeHistory, Activity, Sex, Movement
 from SalNetIBM.fish_model import FishModel
 from SalNetIBM.settings import export_settings, time_settings
 
+
 def clean_show(item):
     reset_output()
     show(item)
@@ -31,15 +32,15 @@ def run_model(n_steps):
                                                                   test_model.schedule.fish_count,
                                                                   test_model.schedule.redd_count))
 
-run_model(700)
+run_model(10)
 
 
 import cProfile
-cProfile.run('run_model(5)', 'runstats')
+cProfile.run('run_model(20)', 'runstats')
 
 import pstats
 p = pstats.Stats('runstats')
-p.sort_stats('cumtime').print_stats(20)
+p.sort_stats('time').print_stats(30)
 
 # So the bad ones were already disconnected for pickling, and somehow were still included....
 

@@ -213,6 +213,7 @@ class StreamNetwork:
                     habitat_preferences[temperature] = {}
                 habitat_preferences[temperature][fork_length] = habitat_preferences_from_file(os.path.join(nrei_folder, filename))
         self.habitat_preferences = habitat_preferences
+        self.habitat_preference_fork_lengths = np.array(sorted(list(habitat_preferences[1].keys())))
         print("Finished loading habitat preference library.")
 
     def season_label(self, history_step):
